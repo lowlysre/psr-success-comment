@@ -18,7 +18,6 @@ It does for PSR what the `success` step of [`@semantic-release/github`](https://
 - 🔁 Re-run safe: a hidden per-release marker prevents duplicate comments.
 - 🧭 Monorepo ready: same-format tags find the previous release, and `paths` scopes the commits.
 - 🚦 Rate-limit aware: one request at a time, a second between writes, per [GitHub's REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
-- 🛑 Guarded: `max-targets` stops an oversized release before any write, and `dry-run` previews one.
 - 📦 Two runtime dependencies, bundled with [their licenses](dist/THIRD_PARTY_LICENSES.txt).
 - 🛡️ Hardened CI: harden-runner egress blocking (the release job audits), SHA-pinned actions, pedantic zizmor, CodeQL.
 
