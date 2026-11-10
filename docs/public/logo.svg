@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="psr-success-comment">
   <!-- The lowlysre inchworm (body, tail, head, eye, antennae, smile) saying a check mark. -->
   <rect x="6" y="6" width="188" height="188" rx="40" fill="#161b22" stroke="#30363d" stroke-width="5"/>
-  <g transform="translate(-4 26)">
+  <g transform="translate(4 44) scale(0.9)">
     <path d="M38,136 Q68,60 100,60 Q132,60 158,130" stroke="#3fb950" stroke-width="24" stroke-linecap="round" fill="none"/>
     <circle cx="34" cy="138" r="13" fill="#3fb950"/>
     <circle cx="162" cy="136" r="18" fill="#3fb950"/>
@@ -9,6 +9,6 @@
     <path d="M171,121 q4,-11 13,-14 M162,119 q0,-12 6,-18" stroke="#3fb950" stroke-width="4" stroke-linecap="round" fill="none"/>
     <path d="M172,141 q4.5,3.5 9,1" stroke="#161b22" stroke-width="2.8" stroke-linecap="round" fill="none"/>
   </g>
-  <path d="M96 24h62a14 14 0 0 1 14 14v26a14 14 0 0 1-14 14h-2l6 20-24-20H96a14 14 0 0 1-14-14V38a14 14 0 0 1 14-14z" fill="#161b22" stroke="#58a6ff" stroke-width="7" stroke-linejoin="round"/>
-  <path d="M106 51l13 13 25-27" fill="none" stroke="#e6edf3" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M106 18h60a14 14 0 0 1 14 14v18a14 14 0 0 1-14 14h-2l4 18-20-18H106a14 14 0 0 1-14-14V32a14 14 0 0 1 14-14z" fill="#161b22" stroke="#58a6ff" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M118 41l11 11 21-22" fill="none" stroke="#e6edf3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
