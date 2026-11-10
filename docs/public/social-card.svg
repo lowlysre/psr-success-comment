@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">PSR Success Comment</title>
+  <desc id="desc">Social card: comment on and label the pull requests and issues that ship in a python-semantic-release release. A pull request on the right receives a comment saying it is included in version 1.4.0, then a released label.</desc>
+  <!-- Palette: GitHub's dark theme (canvas, borders, link blue, success green, merged purple),
+       with Python's yellow as the accent. -->
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#58a6ff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="1080" cy="20" r="700" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f6feb" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#1f6feb" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="120" cy="660" r="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#238636" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#238636" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="heading" x1="80" y1="0" x2="560" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3fb950"/>
+      <stop offset="0.55" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#a371f7"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <rect width="1280" height="640" fill="url(#glow2)"/>
+
+  <!-- Mark: a comment bubble holding a check, with the lowlysre worm at its tail. 64-unit grid. -->
+  <g transform="translate(78 78) scale(0.875)">
+    <rect x="4" y="4" width="56" height="56" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <path d="M18 16h28a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H31l-9 8v-8h-4a5 5 0 0 1-5-5V21a5 5 0 0 1 5-5z" fill="none" stroke="#58a6ff" stroke-width="3.5" stroke-linejoin="round"/>
+    <path d="M24 28l6 6 11-12" fill="none" stroke="#3fb950" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="47" cy="47" r="4.6" fill="#161b22"/>
+    <circle cx="47" cy="47" r="3.6" fill="#3fb950"/>
+    <circle cx="48.1" cy="45.9" r="0.9" fill="#161b22"/>
+  </g>
+  <g font-family="Segoe UI" font-weight="700" font-size="72" fill="url(#heading)">
+    <text x="78" y="226">PSR Success</text>
+    <text x="78" y="306">Comment</text>
+  </g>
+  <g font-family="Segoe UI" font-size="25" fill="#c9d1d9">
+    <text x="80" y="374">Tell pull requests and issues which</text>
+    <text x="80" y="408">python-semantic-release version shipped them.</text>
+  </g>
+  <g transform="translate(80 446)">
+    <rect width="44" height="4" rx="2" fill="#3fb950"/>
+    <rect x="48" width="44" height="4" rx="2" fill="#58a6ff"/>
+    <rect x="96" width="44" height="4" rx="2" fill="#a371f7"/>
+    <rect x="144" width="44" height="4" rx="2" fill="#ffd43b"/>
+  </g>
+  <text x="80" y="548" font-family="Cascadia Mono" font-size="19" fill="#8b949e">lowlysre/psr-success-comment</text>
+  <text x="80" y="580" font-family="Segoe UI" font-size="16" fill="#6e7681">Not affiliated with python-semantic-release or GitHub.</text>
+
+  <!-- Right column: one pull request card, 510 wide at x=690, centred vertically.
+       Header 76px with the title at y=34 and the state row at y=60. The timeline line runs at
+       x=46 behind the comment box and the label event. The card ends 32px below the label event. -->
+  <g transform="translate(690 134)">
+    <rect width="510" height="372" rx="12" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+    <path d="M0 84H510" stroke="#30363d" stroke-width="1.5"/>
+    <text x="26" y="36" font-family="Segoe UI" font-weight="600" font-size="19" fill="#e6edf3">Add a cache for widget lookups <tspan fill="#8b949e" font-weight="400">#128</tspan></text>
+    <rect x="26" y="48" width="78" height="24" rx="12" fill="#8957e5"/>
+    <text x="65" y="65" font-family="Segoe UI" font-weight="600" font-size="13" fill="#ffffff" text-anchor="middle">Merged</text>
+    <text x="114" y="65" font-family="Segoe UI" font-size="13" fill="#8b949e">fix: cache widget lookups (#128)</text>
+
+    <path d="M46 84V344" stroke="#30363d" stroke-width="2"/>
+
+    <!-- Comment box -->
+    <g transform="translate(26 108)">
+      <rect width="458" height="146" rx="8" fill="#0d1117" stroke="#30363d" stroke-width="1.5"/>
+      <path d="M0.75 40H457.25V8A7.25 7.25 0 0 0 450 0.75H8A7.25 7.25 0 0 0 0.75 8z" fill="#161b22"/>
+      <path d="M0 40H458" stroke="#30363d" stroke-width="1.5"/>
+      <circle cx="22" cy="20" r="10" fill="#30363d"/>
+      <path d="M17 20l3.5 3.5 6.5-7" fill="none" stroke="#3fb950" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="42" y="25" font-family="Segoe UI" font-size="14" fill="#8b949e"><tspan fill="#e6edf3" font-weight="600">github-actions</tspan> commented just now</text>
+      <rect x="398" y="10" width="42" height="20" rx="10" fill="none" stroke="#30363d" stroke-width="1.2"/>
+      <text x="419" y="24.5" font-family="Segoe UI" font-size="12" fill="#8b949e" text-anchor="middle">bot</text>
+      <g font-family="Segoe UI" font-size="17" fill="#e6edf3">
+        <text x="20" y="82"><tspan fill="#ffd43b">&#9733;</tspan> This PR is included in version <tspan font-weight="700">1.4.0</tspan> <tspan fill="#ffd43b">&#9733;</tspan></text>
+        <text x="20" y="120" fill="#c9d1d9">The release is available on <tspan fill="#58a6ff">v1.4.0</tspan></text>
+      </g>
+    </g>
+
+    <!-- Label event -->
+    <g transform="translate(26 286)">
+      <circle cx="20" cy="20" r="14" fill="#21262d" stroke="#161b22" stroke-width="3"/>
+      <path d="M13.5 14.5h6l6 6-5 5-6-6z" fill="none" stroke="#8b949e" stroke-width="1.6" stroke-linejoin="round"/>
+      <circle cx="16.8" cy="17.8" r="1.1" fill="#8b949e"/>
+      <text x="46" y="25" font-family="Segoe UI" font-size="14" fill="#8b949e"><tspan fill="#e6edf3" font-weight="600">github-actions</tspan> added the</text>
+      <rect x="212" y="8" width="82" height="24" rx="12" fill="#238636" fill-opacity="0.25" stroke="#3fb950" stroke-width="1.2"/>
+      <text x="253" y="25" font-family="Segoe UI" font-weight="600" font-size="13" fill="#3fb950" text-anchor="middle">released</text>
+      <text x="304" y="25" font-family="Segoe UI" font-size="14" fill="#8b949e">label</text>
+    </g>
+  </g>
+</svg>

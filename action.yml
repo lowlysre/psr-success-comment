@@ -1,0 +1,72 @@
+name: 'PSR Success Comment'
+description: 'Comment on and label the pull requests and issues resolved by a python-semantic-release release.'
+author: 'lowlysre'
+branding:
+  icon: 'message-circle'
+  color: 'green'
+
+inputs:
+  tag:
+    description: 'Git tag of the release. Pass the `tag` output of python-semantic-release.'
+    required: true
+  version:
+    description: 'Version of the release. Pass the `version` output of python-semantic-release.'
+    required: true
+  release-url:
+    description: 'URL of the release, linked from the comment. Pass the `link` output of python-semantic-release.'
+    required: false
+    default: ''
+  previous-tag:
+    description: 'Tag of the previous release. Defaults to the nearest earlier tag with the same format as `tag`.'
+    required: false
+    default: ''
+  paths:
+    description: 'Paths, one per line, that limit the release to commits touching them. For monorepo packages.'
+    required: false
+    default: ''
+  comment:
+    description: 'Comment template. Replaces {version}, {tag}, {url}, and {type}. Defaults to the built-in comment.'
+    required: false
+    default: ''
+  labels:
+    description: 'Labels, one per line, to add to each pull request and issue. Set to an empty string to add none.'
+    required: false
+    default: 'released'
+  max-targets:
+    description: 'Fail without writing anything when more pull requests and issues than this are found. 0 for no limit.'
+    required: false
+    default: '100'
+  dry-run:
+    description: 'Find the pull requests and issues and report them, without commenting or labeling.'
+    required: false
+    default: 'false'
+  summary:
+    description: 'Write the results to the job summary page.'
+    required: false
+    default: 'true'
+  token:
+    description: 'GitHub token used to read pull requests and to comment and label.'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  previous-tag:
+    description: 'Tag the release was compared with. Empty on a first release.'
+  commits:
+    description: 'Number of commits in the release.'
+  pull-requests:
+    description: 'JSON array of the pull request numbers found.'
+  issues:
+    description: 'JSON array of the issue numbers found.'
+  commented:
+    description: 'JSON array of the numbers that received a comment in this run.'
+  skipped:
+    description: 'JSON array of the numbers skipped: already commented, forbidden, or not found.'
+  failed:
+    description: 'JSON array of the numbers that could not be updated.'
+  json:
+    description: 'JSON array with the number, kind, url, status, and detail of every pull request and issue.'
+
+runs:
+  using: 'node24'
+  main: 'dist/index.cjs'

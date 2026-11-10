@@ -1,0 +1,8 @@
+psr-success-comment
+Copyright 2026 lowlysre
+
+Built and maintained by lowlysre (https://github.com/lowlysre). This product is an independent project and is not affiliated with or endorsed by python-semantic-release, semantic-release, or GitHub.
+
+The lookups, the default comment wording, and the error handling follow the success step of @semantic-release/github (MIT, https://github.com/semantic-release/github). No code from that project is copied; docs/how-it-works.md links each behavior to its source.
+
+Third-party code bundled into dist/index.cjs, including the GitHub Actions toolkit (MIT, Copyright GitHub) and issue-parser (MIT, Copyright Pierre Vanduynslager), is listed with each license in dist/THIRD_PARTY_LICENSES.txt.
