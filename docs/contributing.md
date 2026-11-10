@@ -13,6 +13,7 @@ npm run check
 - [The dist directory](#the-dist-directory)
 - [Releases](#releases)
 - [Docs](#docs)
+- [Required status checks](#required-status-checks)
 - [Workflow security](#workflow-security)
 
 ## Layout
@@ -62,6 +63,15 @@ Every push to `main` runs [`release.yml`](../.github/workflows/release.yml). pyt
 ## Docs
 
 Each page under `docs/` starts with a table of contents of its `##` headings, updated by hand. MegaLinter fails on a link or anchor that points nowhere: markdownlint within a page, lychee across pages.
+
+## Required status checks
+
+Each pull request workflow ends in a [`lowlydba/are-we-good`](https://github.com/lowlydba/are-we-good) job that fails if any job it needs failed or was cancelled. Require these two checks, not the jobs behind them:
+
+- `ci-are-we-good`: type check, tests, build, zizmor, and MegaLinter.
+- `codeql-are-we-good`: CodeQL for the workflows and the TypeScript.
+
+`scorecard.yml` and `release.yml` run on pushes to `main` only.
 
 ## Workflow security
 
