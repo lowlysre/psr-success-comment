@@ -15,12 +15,12 @@ Tell the people behind a release that it shipped. After [python-semantic-release
 
 It does for PSR what the `success` step of [`@semantic-release/github`](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/success.js) does for the Node semantic-release. PSR has no equivalent: the request is tracked in [python-semantic-release#975](https://github.com/python-semantic-release/python-semantic-release/issues/975), which was open when this was written (2026-11-10).
 
-- 🔁 Safe to re-run: each comment carries a hidden marker for its release, and a pull request or issue that already has it is not commented on again.
-- 🧭 Monorepo aware: the previous release is found from tags with the same format, and `paths` limits a release to one package's commits.
-- 🚦 Careful with the API: requests run one at a time, writes are spaced a second apart, and rate limits are waited out, following [GitHub's REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
-- 🛑 Guarded: a release that would touch more than 100 pull requests and issues stops before writing anything, and `dry-run` shows what a run would do.
-- 📦 Two runtime dependencies: `@actions/core` and `issue-parser`, bundled into `dist/` with [every third-party license](dist/THIRD_PARTY_LICENSES.txt).
-- 🛡️ Hardened CI: every job blocks network egress with harden-runner, every action is pinned to a commit SHA, the workflows pass zizmor's pedantic audit, and CodeQL scans the code and workflows.
+- 🔁 Re-run safe: a hidden per-release marker prevents duplicate comments.
+- 🧭 Monorepo ready: same-format tags find the previous release, and `paths` scopes the commits.
+- 🚦 Rate-limit aware: one request at a time, a second between writes, per [GitHub's REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api).
+- 🛑 Guarded: `max-targets` stops an oversized release before any write, and `dry-run` previews one.
+- 📦 Two runtime dependencies, bundled with [their licenses](dist/THIRD_PARTY_LICENSES.txt).
+- 🛡️ Hardened CI: harden-runner egress blocking (the release job audits), SHA-pinned actions, pedantic zizmor, CodeQL.
 
 This action is built and maintained by [lowlysre](https://github.com/lowlysre) 🐍. It's an independent project, not affiliated with or endorsed by python-semantic-release or semantic-release.
 
