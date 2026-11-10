@@ -25,7 +25,7 @@ PSR reports a `previous_version` output, but it is the highest version tag in th
 
 1. It builds a pattern from `tag` and `version` by replacing the version with `*.*.*`. Tag `v1.4.0` gives `v*.*.*`, and a monorepo tag `pkg-v1.4.0` gives `pkg-v*.*.*`, so only tags of the same package match. Partial tags such as `v1` and `v1.4` don't match.
 2. It runs `git describe --tags --abbrev=0 --match <pattern>` on the parent of the tagged commit, which returns the nearest matching tag in the history.
-3. For a full release it excludes pre-release tags (`v*.*.*-*`), so `1.4.0` is compared with `1.3.0` and not with `1.4.0-rc.2`. Pull requests announced for a release candidate are announced again for the full release. A pre-release is compared with the nearest tag of either kind.
+3. For a full release it skips pre-release tags, so `1.4.0` is compared with `1.3.0` and not with `1.4.0-rc.2`. A tag is a pre-release when the version inside it has a hyphen right after the patch number, so a hyphen in build metadata (`1.3.0+build-5`) doesn't count. Pull requests announced for a release candidate are announced again for the full release. A pre-release is compared with the nearest tag of either kind.
 4. If no tag matches, it is a first release, and every commit up to `tag` is included.
 
 Set `previous-tag` to skip all of this.
@@ -39,6 +39,8 @@ Source: `findPullRequests` in [`src/release.ts`](../src/release.ts). Tests: [`te
 The action asks the GraphQL API for the `associatedPullRequests` of each commit, 100 commits per query, as the Node plugin does ([L79-L118](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/success.js#L79-L118)).
 
 GitHub can associate a pull request with a commit it merely contains, so each candidate is kept only if its merge commit, or one of its own commits, is in the release. This is the Node plugin's filter ([L120-L141](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/success.js#L120-L141)). The merge commit comes back with the first query, so the pull request's commit list is only fetched when the merge commit doesn't match.
+
+Each query is sized to stay under GitHub's [500,000-node limit](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api#node-limit): 100 commits, 40 pull requests per commit and page, and up to 100 labels per pull request, which is about 404,000 nodes. The Node plugin reads 40 labels ([`baseFields`, L382](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/success.js#L382)) and asks for 100 pull requests, which fits. This action reads more labels for `skip-labels`, and its first version, with 100 pull requests and 100 labels, was rejected by the live API with "up to 1,010,000 possible nodes" for a 908-commit release.
 
 ## 3. Find the closed issues
 
@@ -65,7 +67,7 @@ A 403 or 404 skips that pull request or issue, and any other error is reported a
 Requests follow [GitHub's REST best practices](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api):
 
 - They run one at a time, with one second after each write.
-- A rate-limited response is retried after the time in `retry-after`, or at `x-ratelimit-reset`, or after one minute that doubles on each attempt. A wait longer than five minutes fails instead.
+- A rate-limited response is retried after the time in `retry-after`, or at `x-ratelimit-reset`, or after one minute that doubles on each attempt. A wait longer than five minutes fails instead. GraphQL reports a rate limit as HTTP 200 with an error ([docs](https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api#exceeding-the-rate-limit)), and is retried the same way.
 - Reads, and the label request, are retried on network errors and 5xx responses, up to three times. Three is the Node plugin's retry count ([`retry.js`](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/definitions/retry.js)).
 - Posting a comment is not retried on a network error or 5xx, because the comment may have been created.
 

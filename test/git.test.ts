@@ -5,13 +5,13 @@ import { makeRepo, type TestRepo } from './helpers.ts'
 
 describe('tagGlobs', () => {
   it('swaps the version for a wildcard, keeping the prefix and suffix', () => {
-    assert.deepEqual(tagGlobs('v1.2.3', '1.2.3'), { all: 'v*.*.*', prerelease: 'v*.*.*-*' })
-    assert.deepEqual(tagGlobs('pkg-v1.2.3', '1.2.3'), { all: 'pkg-v*.*.*', prerelease: 'pkg-v*.*.*-*' })
-    assert.deepEqual(tagGlobs('1.2.3-pkg', '1.2.3'), { all: '*.*.*-pkg', prerelease: '*.*.*-*-pkg' })
+    assert.deepEqual(tagGlobs('v1.2.3', '1.2.3'), { all: 'v*.*.*', prefixLength: 1, suffixLength: 0 })
+    assert.deepEqual(tagGlobs('pkg-v1.2.3', '1.2.3'), { all: 'pkg-v*.*.*', prefixLength: 5, suffixLength: 0 })
+    assert.deepEqual(tagGlobs('1.2.3-pkg', '1.2.3'), { all: '*.*.*-pkg', prefixLength: 0, suffixLength: 4 })
   })
 
   it('escapes glob characters in the tag', () => {
-    assert.deepEqual(tagGlobs('a[b]*v1.0.0', '1.0.0'), { all: 'a\\[b\\]\\*v*.*.*', prerelease: 'a\\[b\\]\\*v*.*.*-*' })
+    assert.deepEqual(tagGlobs('a[b]*v1.0.0', '1.0.0'), { all: 'a\\[b\\]\\*v*.*.*', prefixLength: 6, suffixLength: 0 })
   })
 
   it('returns undefined when the tag does not contain the version', () => {
@@ -25,6 +25,35 @@ describe('isPrerelease', () => {
     assert.equal(isPrerelease('1.0.0-rc.1'), true)
     assert.equal(isPrerelease('1.0.0'), false)
     assert.equal(isPrerelease('1.0.0+build-5'), false)
+  })
+})
+
+describe('previousTag with unusual tags', () => {
+  let repo: TestRepo
+  let git: Git
+  before(() => {
+    repo = makeRepo()
+    git = gitIn(repo.dir)
+    repo.commit('feat: one')
+    repo.tag('v1.0.0+build-5')
+    repo.commit('feat: two')
+    repo.tag('v1.1.0-rc.1')
+    repo.commit('fix: three')
+    repo.tag('v1.1.0-rc.2+build-7')
+    repo.commit('fix: four')
+    repo.tag('v1.1.0')
+    repo.commit('fix: five')
+    repo.tag('v1.1.1+build-9')
+  })
+  after(() => repo.remove())
+
+  it('treats a hyphen in build metadata as part of a full release, not a pre-release', async () => {
+    assert.equal(await previousTag(git, 'v1.1.0', '1.1.0'), 'v1.0.0+build-5')
+    assert.equal(await previousTag(git, 'v1.1.1+build-9', '1.1.1+build-9'), 'v1.1.0')
+  })
+
+  it('compares a pre-release with the nearest tag of either kind', async () => {
+    assert.equal(await previousTag(git, 'v1.1.0-rc.2+build-7', '1.1.0-rc.2+build-7'), 'v1.1.0-rc.1')
   })
 })
 

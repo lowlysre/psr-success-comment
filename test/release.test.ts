@@ -85,6 +85,23 @@ describe('findPullRequests', () => {
     })
   })
 
+  it('keeps every query under GitHub GraphQL 500,000 node limit', async () => {
+    fake.issues.add(1)
+    const commits = Array.from({ length: 100 }, (_, i) => commit(i + 1))
+    await findPullRequests(fake.gh, repo, commits)
+    await findClosed(fake.gh, repo, [Array.from({ length: 100 }, (_, i) => `Fixes #${i + 1}`).join(', ')], parse, new Set())
+    const queries = fake.calls.map(call => (call.body as { query: string }).query)
+    assert.ok(queries.length >= 2)
+    for (const query of queries) {
+      const aliases = query.match(/(?:c\d+: object|i\d+: issueOrPullRequest)/g)?.length ?? 1
+      const pullRequests = Number(/associatedPullRequests\(first: (\d+)/.exec(query)?.[1] ?? 1)
+      const labels = Number(/labels\(first: (\d+)/.exec(query)?.[1] ?? 0)
+      // Every alias is one node, plus its pull requests, each with its labels.
+      const nodes = aliases * (1 + pullRequests * (1 + labels))
+      assert.ok(nodes < 500_000, `${nodes} possible nodes`)
+    }
+  })
+
   it('queries commits in chunks of 100', async () => {
     const commits = Array.from({ length: 250 }, (_, i) => commit(i + 1))
     await findPullRequests(fake.gh, repo, commits)
@@ -145,6 +162,16 @@ describe('filterReason', () => {
   it('filters by label, ignoring case', () => {
     assert.equal(filterReason(pr, { ...noFilters, skipLabels: ['wontfix', 'dependencies'] }), "label 'Dependencies'")
     assert.equal(filterReason(pr, { ...noFilters, skipLabels: ['wontfix'] }), undefined)
+  })
+
+  it('does not treat [bot] as a suffix of a label', () => {
+    const labeled = { ...pr, labels: ['automation'] }
+    assert.equal(filterReason(labeled, { ...noFilters, skipLabels: ['automation[bot]'] }), undefined)
+    assert.equal(
+      filterReason({ ...pr, labels: ['automation[bot]'] }, { ...noFilters, skipLabels: ['Automation[BOT]'] }),
+      "label 'automation[bot]'"
+    )
+    assert.equal(filterReason({ ...pr, labels: ['automation[bot]'] }, { ...noFilters, skipLabels: ['automation'] }), undefined)
   })
 
   it('filters by author, matching a bot with or without its [bot] suffix', () => {

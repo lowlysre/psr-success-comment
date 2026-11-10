@@ -71,15 +71,26 @@ export class GitHub {
     return items
   }
 
-  /** Runs a read-only query. NOT_FOUND errors come back with partial data; any other error throws. */
+  /**
+   * Runs a read-only query. NOT_FOUND errors come back with partial data; any other error throws.
+   * GraphQL reports a rate limit as HTTP 200 with an error, so it is waited out here, like a REST one.
+   */
   async graphql<T>(query: string, variables: Record<string, unknown>): Promise<T> {
-    const res = await this.#send('POST', this.#options.graphqlUrl, { query, variables }, true)
-    const { data, errors = [] } = (await res.json()) as { data?: T; errors?: GraphQLError[] }
-    const fatal = errors.filter(error => error.type !== 'NOT_FOUND')
-    if (fatal.length > 0 || !data) {
-      throw new Error(`GraphQL query failed: ${fatal.map(error => error.message).join('; ') || 'no data returned'}`)
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.#send('POST', this.#options.graphqlUrl, { query, variables }, true)
+      const { data, errors = [] } = (await res.json()) as { data?: T; errors?: GraphQLError[] }
+      const fatal = errors.filter(error => error.type !== 'NOT_FOUND')
+      const limited = fatal.some(error => error.type === 'RATE_LIMITED' || /rate limit/i.test(error.message))
+      const wait = graphqlRateLimitWait(res, attempt, this.#now())
+      if (limited && attempt < RETRIES && wait <= MAX_WAIT_MS) {
+        await this.#wait('POST', this.#options.graphqlUrl, wait, 'rate limited')
+        continue
+      }
+      if (fatal.length > 0 || !data) {
+        throw new Error(`GraphQL query failed: ${fatal.map(error => error.message).join('; ') || 'no data returned'}`)
+      }
+      return data
     }
-    return data
   }
 
   async #send(method: string, url: string, body: unknown, retry: boolean): Promise<Response> {
@@ -135,13 +146,24 @@ export class GitHub {
  */
 export function rateLimitWait(res: Response, text: string, attempt: number, now: number): number | undefined {
   if (res.status !== 403 && res.status !== 429) return undefined
+  return headerWait(res, now) ?? (res.status === 429 || /rate limit/i.test(text) ? backoff(attempt) : undefined)
+}
+
+/**
+ * The wait for a GraphQL response that reported a rate limit. Same rules as REST, from the response
+ * headers, and a minute that doubles when they give no time:
+ * https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api#exceeding-the-rate-limit
+ */
+export const graphqlRateLimitWait = (res: Response, attempt: number, now: number): number => headerWait(res, now) ?? backoff(attempt)
+
+const backoff = (attempt: number): number => 60_000 * 2 ** attempt
+
+function headerWait(res: Response, now: number): number | undefined {
   const retryAfter = Number.parseInt(res.headers.get('retry-after') ?? '', 10)
   if (Number.isFinite(retryAfter)) return Math.max(retryAfter, 0) * 1000
-  if (res.headers.get('x-ratelimit-remaining') === '0') {
-    const reset = Number.parseInt(res.headers.get('x-ratelimit-reset') ?? '', 10)
-    return Number.isFinite(reset) ? Math.max(reset * 1000 - now, 0) + 1000 : 60_000
-  }
-  return res.status === 429 || /rate limit/i.test(text) ? 60_000 * 2 ** attempt : undefined
+  if (res.headers.get('x-ratelimit-remaining') !== '0') return undefined
+  const reset = Number.parseInt(res.headers.get('x-ratelimit-reset') ?? '', 10)
+  return Number.isFinite(reset) ? Math.max(reset * 1000 - now, 0) + 1000 : 60_000
 }
 
 function describe(text: string): string {

@@ -63,8 +63,12 @@ interface PullRequestPage {
 type CommitNode = { associatedPullRequests?: PullRequestPage } | null
 
 const CHUNK = 100
+// GraphQL rejects a query that could request more than 500,000 nodes, counting every page size and label list:
+// https://docs.github.com/en/graphql/overview/rate-limits-and-query-limits-for-the-graphql-api#node-limit
+// A chunk asks for CHUNK commits x PR_PAGE pull requests x (1 + 100 labels) = 404,000 nodes, plus the commits.
+const PR_PAGE = 40
 const NODE = 'number url author { login } labels(first: 100) { nodes { name } }'
-const PAGE = `associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`
+const PAGE = `associatedPullRequests(first: ${PR_PAGE}, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`
 const NEXT_PAGE = `query($owner: String!, $repo: String!, $sha: GitObjectID!, $cursor: String) {
   repository(owner: $owner, name: $repo) { commit: object(oid: $sha) { ... on Commit { ${PAGE} } } }
 }`
@@ -78,14 +82,15 @@ export const toTarget = (node: Node, kind: Kind): Target => ({
 })
 
 // GraphQL reports a bot as "dependabot" and REST as "dependabot[bot]"; both spellings match.
-const normalize = (name: string): string => name.toLowerCase().replace(/\[bot\]$/, '')
+const sameAuthor = (a: string, b: string): boolean => a.toLowerCase().replace(/\[bot\]$/, '') === b.toLowerCase().replace(/\[bot\]$/, '')
+const sameLabel = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
 
 /** Why the filters leave a target out, or undefined when it should be commented on. */
 export function filterReason(target: Target, { targets, skipLabels, skipAuthors }: Filters): string | undefined {
   if (targets !== 'all' && (targets === 'pull-requests') !== (target.kind === 'pr')) return `targets is '${targets}'`
-  const label = target.labels.find(name => skipLabels.some(skip => normalize(skip) === normalize(name)))
+  const label = target.labels.find(name => skipLabels.some(skip => sameLabel(skip, name)))
   if (label) return `label '${label}'`
-  if (target.author && skipAuthors.some(skip => normalize(skip) === normalize(target.author))) return `author '${target.author}'`
+  if (target.author && skipAuthors.some(skip => sameAuthor(skip, target.author))) return `author '${target.author}'`
   return undefined
 }
 

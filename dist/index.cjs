@@ -20460,10 +20460,10 @@ var require_issue_parser = __commonJS({
         `The ${[parentOpt, opt].filter(Boolean).join(".")} property must be a String or an array of Strings`
       );
     }
-    function normalize2(options, parentOpt) {
+    function normalize(options, parentOpt) {
       for (const opt of Object.keys(options)) {
         if (!parentOpt && opt === "actions") {
-          normalize2(options[opt], opt);
+          normalize(options[opt], opt);
         } else {
           if (!options[opt]) {
             options[opt] = [];
@@ -20501,7 +20501,7 @@ var require_issue_parser = __commonJS({
         ...overrides,
         actions: { ...hostConfig.default.actions, ...options.actions, ...overrides.actions }
       };
-      normalize2(mergedOptions);
+      normalize(mergedOptions);
       mergedOptions.hosts = mergedOptions.hosts.map(addTrailingSlash);
       mergedOptions.issueURLSegments = mergedOptions.issueURLSegments.map(addLeadingAndTrailingSlash);
       const regexp = buildRegexp(mergedOptions);
@@ -21103,22 +21103,29 @@ var isPrerelease = (version) => /^\d+\.\d+\.\d+-/.test(version);
 function tagGlobs(tag, version) {
   const at = version ? tag.lastIndexOf(version) : -1;
   if (at < 0) return void 0;
+  const suffixLength = tag.length - at - version.length;
   const prefix = escapeGlob(tag.slice(0, at));
   const suffix = escapeGlob(tag.slice(at + version.length));
-  return { all: `${prefix}*.*.*${suffix}`, prerelease: `${prefix}*.*.*-*${suffix}` };
+  return { all: `${prefix}*.*.*${suffix}`, prefixLength: at, suffixLength };
 }
 async function previousTag(git, tag, version) {
   const globs = tagGlobs(tag, version);
   if (!globs) {
     throw new Error(`Tag '${tag}' does not contain version '${version}', so the previous tag can't be derived. Set 'previous-tag'.`);
   }
-  const args = ["describe", "--tags", "--abbrev=0", `--match=${globs.all}`];
-  if (!isPrerelease(version)) args.push(`--exclude=${globs.prerelease}`);
-  try {
-    return (await git([...args, `${ref(tag)}^`])).trim();
-  } catch (err) {
-    if (NO_TAG.test(err.message)) return void 0;
-    throw err;
+  const skipped = [];
+  for (; ; ) {
+    let found;
+    try {
+      const args = ["describe", "--tags", "--abbrev=0", `--match=${globs.all}`, ...skipped.map((name) => `--exclude=${escapeGlob(name)}`)];
+      found = (await git([...args, `${ref(tag)}^`])).trim();
+    } catch (err) {
+      if (NO_TAG.test(err.message)) return void 0;
+      throw err;
+    }
+    const foundVersion = found.slice(globs.prefixLength, found.length - globs.suffixLength);
+    if (isPrerelease(version) || !isPrerelease(foundVersion)) return found;
+    skipped.push(found);
   }
 }
 async function listCommits(git, base, tag, paths = []) {
@@ -21177,15 +21184,26 @@ var GitHub = class {
     }
     return items;
   }
-  /** Runs a read-only query. NOT_FOUND errors come back with partial data; any other error throws. */
+  /**
+   * Runs a read-only query. NOT_FOUND errors come back with partial data; any other error throws.
+   * GraphQL reports a rate limit as HTTP 200 with an error, so it is waited out here, like a REST one.
+   */
   async graphql(query, variables) {
-    const res = await this.#send("POST", this.#options.graphqlUrl, { query, variables }, true);
-    const { data, errors = [] } = await res.json();
-    const fatal = errors.filter((error2) => error2.type !== "NOT_FOUND");
-    if (fatal.length > 0 || !data) {
-      throw new Error(`GraphQL query failed: ${fatal.map((error2) => error2.message).join("; ") || "no data returned"}`);
+    for (let attempt = 0; ; attempt++) {
+      const res = await this.#send("POST", this.#options.graphqlUrl, { query, variables }, true);
+      const { data, errors = [] } = await res.json();
+      const fatal = errors.filter((error2) => error2.type !== "NOT_FOUND");
+      const limited = fatal.some((error2) => error2.type === "RATE_LIMITED" || /rate limit/i.test(error2.message));
+      const wait = graphqlRateLimitWait(res, attempt, this.#now());
+      if (limited && attempt < RETRIES && wait <= MAX_WAIT_MS) {
+        await this.#wait("POST", this.#options.graphqlUrl, wait, "rate limited");
+        continue;
+      }
+      if (fatal.length > 0 || !data) {
+        throw new Error(`GraphQL query failed: ${fatal.map((error2) => error2.message).join("; ") || "no data returned"}`);
+      }
+      return data;
     }
-    return data;
   }
   async #send(method, url, body, retry) {
     for (let attempt = 0; ; attempt++) {
@@ -21232,13 +21250,16 @@ var GitHub = class {
 };
 function rateLimitWait(res, text, attempt, now) {
   if (res.status !== 403 && res.status !== 429) return void 0;
+  return headerWait(res, now) ?? (res.status === 429 || /rate limit/i.test(text) ? backoff(attempt) : void 0);
+}
+var graphqlRateLimitWait = (res, attempt, now) => headerWait(res, now) ?? backoff(attempt);
+var backoff = (attempt) => 6e4 * 2 ** attempt;
+function headerWait(res, now) {
   const retryAfter = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
   if (Number.isFinite(retryAfter)) return Math.max(retryAfter, 0) * 1e3;
-  if (res.headers.get("x-ratelimit-remaining") === "0") {
-    const reset = Number.parseInt(res.headers.get("x-ratelimit-reset") ?? "", 10);
-    return Number.isFinite(reset) ? Math.max(reset * 1e3 - now, 0) + 1e3 : 6e4;
-  }
-  return res.status === 429 || /rate limit/i.test(text) ? 6e4 * 2 ** attempt : void 0;
+  if (res.headers.get("x-ratelimit-remaining") !== "0") return void 0;
+  const reset = Number.parseInt(res.headers.get("x-ratelimit-reset") ?? "", 10);
+  return Number.isFinite(reset) ? Math.max(reset * 1e3 - now, 0) + 1e3 : 6e4;
 }
 function describe(text) {
   try {
@@ -21251,8 +21272,9 @@ function describe(text) {
 
 // src/release.ts
 var CHUNK = 100;
+var PR_PAGE = 40;
 var NODE = "number url author { login } labels(first: 100) { nodes { name } }";
-var PAGE = `associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`;
+var PAGE = `associatedPullRequests(first: ${PR_PAGE}, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`;
 var NEXT_PAGE = `query($owner: String!, $repo: String!, $sha: GitObjectID!, $cursor: String) {
   repository(owner: $owner, name: $repo) { commit: object(oid: $sha) { ... on Commit { ${PAGE} } } }
 }`;
@@ -21263,12 +21285,13 @@ var toTarget = (node, kind) => ({
   author: node.author?.login ?? "",
   labels: node.labels?.nodes.map((label2) => label2.name) ?? []
 });
-var normalize = (name) => name.toLowerCase().replace(/\[bot\]$/, "");
+var sameAuthor = (a, b) => a.toLowerCase().replace(/\[bot\]$/, "") === b.toLowerCase().replace(/\[bot\]$/, "");
+var sameLabel = (a, b) => a.toLowerCase() === b.toLowerCase();
 function filterReason(target, { targets, skipLabels, skipAuthors }) {
   if (targets !== "all" && targets === "pull-requests" !== (target.kind === "pr")) return `targets is '${targets}'`;
-  const label2 = target.labels.find((name) => skipLabels.some((skip) => normalize(skip) === normalize(name)));
+  const label2 = target.labels.find((name) => skipLabels.some((skip) => sameLabel(skip, name)));
   if (label2) return `label '${label2}'`;
-  if (target.author && skipAuthors.some((skip) => normalize(skip) === normalize(target.author))) return `author '${target.author}'`;
+  if (target.author && skipAuthors.some((skip) => sameAuthor(skip, target.author))) return `author '${target.author}'`;
   return void 0;
 }
 function* chunks(items, size) {

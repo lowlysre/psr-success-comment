@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
-import { GitHub, HttpError, rateLimitWait } from '../src/github.ts'
+import { GitHub, graphqlRateLimitWait, HttpError, rateLimitWait } from '../src/github.ts'
 import { fakeGitHub, type FakeGitHub } from './helpers.ts'
 
 const response = (status: number, headers: Record<string, string> = {}): Response => new Response(null, { status, headers })
@@ -26,6 +26,15 @@ describe('rateLimitWait', () => {
   it('waits a minute, then doubles, for a secondary limit without headers', () => {
     assert.equal(rateLimitWait(response(403), 'You have exceeded a secondary rate limit', 0, 0), 60_000)
     assert.equal(rateLimitWait(response(429), '', 2, 0), 240_000)
+  })
+})
+
+describe('graphqlRateLimitWait', () => {
+  it('uses the headers, and otherwise a minute that doubles', () => {
+    assert.equal(graphqlRateLimitWait(response(200, { 'retry-after': '4' }), 0, 0), 4000)
+    assert.equal(graphqlRateLimitWait(response(200, { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '100' }), 0, 90_000), 11_000)
+    assert.equal(graphqlRateLimitWait(response(200, { 'x-ratelimit-remaining': '12' }), 0, 0), 60_000)
+    assert.equal(graphqlRateLimitWait(response(200), 2, 0), 240_000)
   })
 })
 
@@ -165,12 +174,58 @@ describe('GitHub client', () => {
     })
   })
 
+  const limited = (headers: Record<string, string> = {}) => ({
+    status: 200,
+    body: { data: null, errors: [{ type: 'RATE_LIMITED', message: 'API rate limit already exceeded for user ID 1.' }] },
+    headers
+  })
+  const ok = { status: 200, body: { data: { repository: { i1: null } } } }
+
+  it('waits out a GraphQL rate limit reported with HTTP 200, then returns the data', async () => {
+    fake.canned.set('POST /graphql', [
+      limited({ 'retry-after': '2' }),
+      limited({ 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '0' }),
+      ok
+    ])
+    assert.deepEqual(await fake.gh.graphql('query { x }', {}), { repository: { i1: null } })
+    assert.equal(fake.waits.length, 2)
+    assert.equal(fake.waits[0], 2000)
+    assert.equal(fake.waits[1], 1000)
+    assert.equal(fake.calls.length, 3)
+  })
+
+  it('treats a secondary limit without an error type as a rate limit too', async () => {
+    const secondary = {
+      status: 200,
+      body: { data: null, errors: [{ message: 'You have exceeded a secondary rate limit.' }] },
+      headers: { 'retry-after': '5' }
+    }
+    fake.canned.set('POST /graphql', [secondary, ok])
+    await fake.gh.graphql('query { x }', {})
+    assert.deepEqual(fake.waits, [5000])
+  })
+
+  it('gives up on a GraphQL rate limit after three retries, or when the wait is too long', async () => {
+    fake.canned.set(
+      'POST /graphql',
+      Array.from({ length: 4 }, () => limited({ 'retry-after': '1' }))
+    )
+    await assert.rejects(fake.gh.graphql('query { x }', {}), /GraphQL query failed: API rate limit already exceeded/)
+    assert.equal(fake.calls.length, 4)
+    assert.deepEqual(fake.waits, [1000, 1000, 1000])
+
+    fake.waits.length = 0
+    fake.canned.set('POST /graphql', [limited({ 'retry-after': '3600' })])
+    await assert.rejects(fake.gh.graphql('query { x }', {}), /rate limit/)
+    assert.deepEqual(fake.waits, [])
+  })
+
   it('throws on any other GraphQL error, or on missing data', async () => {
     fake.canned.set('POST /graphql', [
-      { status: 200, body: { data: null, errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }, { message: 'second' }] } },
+      { status: 200, body: { data: null, errors: [{ type: 'INSUFFICIENT_SCOPES', message: 'Missing scope' }, { message: 'second' }] } },
       { status: 200, body: {} }
     ])
-    await assert.rejects(fake.gh.graphql('query { x }', {}), /GraphQL query failed: API rate limit exceeded; second/)
+    await assert.rejects(fake.gh.graphql('query { x }', {}), /GraphQL query failed: Missing scope; second/)
     await assert.rejects(fake.gh.graphql('query { x }', {}), /GraphQL query failed: no data returned/)
   })
 })

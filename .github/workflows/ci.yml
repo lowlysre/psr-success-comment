@@ -136,7 +136,8 @@ jobs:
     name: ci-are-we-good
     needs: [test, zizmor, megalinter]
     if: ${{ always() }}
-    runs-on: ubuntu-slim
+    # harden-runner does not run on ubuntu-slim, so it needs a full VM for the block policy to apply.
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:

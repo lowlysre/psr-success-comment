@@ -40,34 +40,43 @@ export async function isShallow(git: Git): Promise<boolean> {
 export const isPrerelease = (version: string): boolean => /^\d+\.\d+\.\d+-/.test(version)
 
 /**
- * Globs for the tags that share this tag's format, found by swapping the version for a wildcard:
- * tag `pkg-v1.2.3` with version `1.2.3` gives `pkg-v*.*.*`, and `pkg-v*.*.*-*` for its pre-releases.
- * The two dots keep out partial tags such as `v1` and `v1.2`, which PSR's `add_partial_tags` creates.
+ * A glob for the tags that share this tag's format, found by swapping the version for a wildcard:
+ * tag `pkg-v1.2.3` with version `1.2.3` gives `pkg-v*.*.*`. The two dots keep out partial tags such as
+ * `v1` and `v1.2`, which PSR's `add_partial_tags` creates. The lengths locate the version inside a matching tag.
  */
-export function tagGlobs(tag: string, version: string): { all: string; prerelease: string } | undefined {
+export function tagGlobs(tag: string, version: string): { all: string; prefixLength: number; suffixLength: number } | undefined {
   const at = version ? tag.lastIndexOf(version) : -1
   if (at < 0) return undefined
+  const suffixLength = tag.length - at - version.length
   const prefix = escapeGlob(tag.slice(0, at))
   const suffix = escapeGlob(tag.slice(at + version.length))
-  return { all: `${prefix}*.*.*${suffix}`, prerelease: `${prefix}*.*.*-*${suffix}` }
+  return { all: `${prefix}*.*.*${suffix}`, prefixLength: at, suffixLength }
 }
 
 /**
  * The nearest tag of the same format in the history before `tag`. A full release skips pre-release
  * tags, so its range covers everything since the last full release. Undefined on a first release.
+ * Tags are classified by the version inside them, so a hyphen in build metadata (`1.0.0+build-5`) is
+ * not mistaken for a pre-release.
  */
 export async function previousTag(git: Git, tag: string, version: string): Promise<string | undefined> {
   const globs = tagGlobs(tag, version)
   if (!globs) {
     throw new Error(`Tag '${tag}' does not contain version '${version}', so the previous tag can't be derived. Set 'previous-tag'.`)
   }
-  const args = ['describe', '--tags', '--abbrev=0', `--match=${globs.all}`]
-  if (!isPrerelease(version)) args.push(`--exclude=${globs.prerelease}`)
-  try {
-    return (await git([...args, `${ref(tag)}^`])).trim()
-  } catch (err) {
-    if (NO_TAG.test((err as Error).message)) return undefined
-    throw err
+  const skipped: string[] = []
+  for (;;) {
+    let found: string
+    try {
+      const args = ['describe', '--tags', '--abbrev=0', `--match=${globs.all}`, ...skipped.map(name => `--exclude=${escapeGlob(name)}`)]
+      found = (await git([...args, `${ref(tag)}^`])).trim()
+    } catch (err) {
+      if (NO_TAG.test((err as Error).message)) return undefined
+      throw err
+    }
+    const foundVersion = found.slice(globs.prefixLength, found.length - globs.suffixLength)
+    if (isPrerelease(version) || !isPrerelease(foundVersion)) return found
+    skipped.push(found)
   }
 }
 
