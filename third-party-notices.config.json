@@ -1,6 +1,0 @@
-{
-  "output": "./dist/THIRD_PARTY_LICENSES.txt",
-  "lineEnding": "lf",
-  "overwrite": true,
-  "allowMissing": true
-}

@@ -1,6 +1,6 @@
 # Recipes
 
-Each recipe assumes the PSR step has `id: release` and the job has the [permissions](permissions.md) the action needs. The examples use `@v1` as a placeholder because this action has no release yet. Once it does, pin it to a full commit SHA with the release tag in a comment.
+Each recipe assumes the PSR step has `id: release` and the job has the [permissions](permissions.md) the action needs. `@v1` is a placeholder: pin to a full commit SHA, with the release tag in a comment.
 
 - [Preview a release without commenting](#preview-a-release-without-commenting)
 - [Write your own comment](#write-your-own-comment)
@@ -13,7 +13,7 @@ Each recipe assumes the PSR step has `id: release` and the job has the [permissi
 
 ## Preview a release without commenting
 
-`dry-run` does every lookup and reports what a real run would do, in the log, the job summary, and the outputs. It only makes read requests.
+`dry-run` does every lookup and reports what a real run would do, in the log, summary, and outputs. It makes read requests only.
 
 ```yaml
 - uses: lowlysre/psr-success-comment@v1
@@ -24,11 +24,11 @@ Each recipe assumes the PSR step has `id: release` and the job has the [permissi
     dry-run: true
 ```
 
-Pull requests and issues that a real run would comment on have the status `would-comment`.
+A real run would comment on each `would-comment` result.
 
 ## Write your own comment
 
-`comment` replaces the built-in text. `{version}`, `{tag}`, `{url}`, and `{type}` are filled in, and the text is otherwise posted as written, so Markdown works.
+`comment` replaces the built-in text. `{version}`, `{tag}`, `{url}`, and `{type}` are filled in, and the rest is posted as written, Markdown included.
 
 ```yaml
 - uses: lowlysre/psr-success-comment@v1
@@ -45,7 +45,7 @@ Pull requests and issues that a real run would comment on have the status `would
 
 ## Label pre-releases differently
 
-PSR's `is_prerelease` output is `"true"` for a pre-release. Use it to pick the label.
+PSR's `is_prerelease` output is `"true"` for a pre-release.
 
 ```yaml
 - uses: lowlysre/psr-success-comment@v1
@@ -56,7 +56,7 @@ PSR's `is_prerelease` output is `"true"` for a pre-release. Use it to pick the l
     labels: ${{ steps.release.outputs.is_prerelease == 'true' && 'pre-released' || 'released' }}
 ```
 
-A pull request that ships in `1.4.0-rc.1` and then in `1.4.0` is commented on for both, and ends up with both labels. See [how the previous release is found](how-it-works.md#1-find-the-commits).
+A pull request that ships in `1.4.0-rc.1` and again in `1.4.0` is commented on for both and ends up with both labels ([how the previous release is found](how-it-works.md#1-find-the-commits)).
 
 ## Comment without labeling
 
@@ -71,7 +71,7 @@ A pull request that ships in `1.4.0-rc.1` and then in `1.4.0` is commented on fo
 
 ## Leave some pull requests and issues alone
 
-`skip-authors` and `skip-labels` keep the action away from pull requests and issues nobody needs to hear about, such as dependency updates. `targets` limits it to one kind.
+Skip dependency updates and similar with `skip-authors` and `skip-labels`, or limit the action to one kind with `targets`.
 
 ```yaml
 - uses: lowlysre/psr-success-comment@v1
@@ -88,14 +88,14 @@ A pull request that ships in `1.4.0-rc.1` and then in `1.4.0` is commented on fo
       internal
 ```
 
-With `targets: issues`, a pull request gets no comment, but an issue it closes with `Fixes #12` still does. Filtered pull requests and issues appear in the log and summary as `filtered`, with the filter that matched. See [filters](reference.md#filters).
+With `targets: issues`, a pull request gets no comment, but an issue it closes with `Fixes #12` still does. [Filters](reference.md#filters) shows how filtered items are reported.
 
 ## Release packages from a monorepo
 
-Run the action once per package, after that package's PSR step. Two things keep each package's announcements separate:
+Run the action once per package, after that package's PSR step.
 
-- The previous release is found among tags with the same format as `tag`. With PSR's `tag_format` set to `pkg1-v{version}`, tag `pkg1-v1.4.0` is compared with the last `pkg1-v*.*.*` tag, and `pkg2-v*` tags are ignored.
-- `paths` limits the release to commits that touch the package. Without it, every commit since the package's last release counts, including commits that only changed other packages.
+- The previous release is the nearest tag with the same format. With `tag_format = "pkg1-v{version}"`, `pkg1-v1.4.0` compares with the last `pkg1-v*.*.*` tag and ignores `pkg2-v*`.
+- `paths` limits the release to commits touching the package. Without it, every commit since the package's last release counts, including ones that changed only other packages.
 
 ```yaml
 - id: release-pkg1
@@ -114,13 +114,13 @@ Run the action once per package, after that package's PSR step. Two things keep 
     labels: released pkg1
 ```
 
-A pull request that touches two packages is commented on once for each package's release, because each release has its own marker.
+A pull request touching two packages is commented on once per package release, because each release has its own marker.
 
-`paths` should match what PSR counts as the package. PSR's monorepo guide scopes commits with [`path_filters`](https://github.com/python-semantic-release/python-semantic-release/blob/60de8fcacea7fd5177f34368490677be5f098995/docs/configuration/configuration-guides/monorepos.rst?plain=1#L79-L111). The action doesn't read PSR's configuration, so list the same paths here, one per line. This setup is tested on synthetic repositories, not on a real PSR monorepo.
+List in `paths` what PSR counts as the package: PSR scopes commits with [`path_filters`](https://github.com/python-semantic-release/python-semantic-release/blob/60de8fcacea7fd5177f34368490677be5f098995/docs/configuration/configuration-guides/monorepos.rst?plain=1#L79-L111), and the action doesn't read PSR's configuration. Tag matching and `paths` have run only on synthetic repositories.
 
 ## Use the results in later steps
 
-The outputs are JSON arrays, so `fromJSON` turns them into values an expression can use.
+The outputs are JSON arrays. Read them with `fromJSON`.
 
 ```yaml
 - id: announce
@@ -138,13 +138,13 @@ The outputs are JSON arrays, so `fromJSON` turns them into values an expression 
   run: echo "Commented on $COMMENTED, skipped $SKIPPED"
 ```
 
-Set `summary: false` when the step runs several times in one job, for example once per package, and the job summary would otherwise fill with tables.
+Set `summary: false` when the step runs several times in one job, such as once per package.
 
 ## Announce a large or first release
 
-A first release has no previous tag, so every commit in the history is part of it. On an established repository that can mean a comment on every pull request ever merged. `max-targets` stops that: when more than 100 pull requests and issues are found, the step fails before writing anything.
+A first release has no previous tag, so every commit in the history counts: on an established repository, a comment on every pull request ever merged. `max-targets` stops that. Above 100 pull requests and issues, the step fails before writing anything.
 
-To leave the history out, tag the commit where announcements should start, with any name, and pass that tag as `previous-tag`. To announce everything, raise the limit, or set it to `0` for no limit:
+To skip the history, tag the commit where announcements should start and pass that tag as `previous-tag`. To announce everything, raise the limit, or set `0` for none:
 
 ```yaml
 - uses: lowlysre/psr-success-comment@v1
@@ -155,4 +155,4 @@ To leave the history out, tag the commit where announcements should start, with 
     max-targets: 500
 ```
 
-Comments are posted about one second apart, so 500 pull requests and issues take at least eight minutes, or twice that with labels.
+Writes are one second apart, so 500 targets take at least eight minutes, twice that with labels.

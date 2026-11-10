@@ -111,7 +111,7 @@ To label pre-releases differently, see [recipes](docs/recipes.md#label-pre-relea
 ## Documentation
 
 - [Reference](docs/reference.md): inputs, outputs, results, and errors
-- [How it works](docs/how-it-works.md): each step, the `@semantic-release/github` code it follows, and what is tested
+- [How it works](docs/how-it-works.md): each step, and the `@semantic-release/github` code it follows
 - [Recipes](docs/recipes.md): monorepos, pre-releases, custom comments, and dry runs
 - [Permissions](docs/permissions.md): token permissions and troubleshooting
 - [Contributing](docs/contributing.md)

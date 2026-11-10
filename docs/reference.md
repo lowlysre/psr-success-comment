@@ -28,9 +28,9 @@
 
 `tag`, `version`, and `link` are outputs of the PSR action, declared in its [`action.yml`](https://github.com/python-semantic-release/python-semantic-release/blob/60de8fcacea7fd5177f34368490677be5f098995/action.yml#L124-L158).
 
-`paths` entries are passed to `git log` as pathspecs (see "pathspec" in the [git glossary](https://git-scm.com/docs/gitglossary)), relative to `GITHUB_WORKSPACE`.
+`paths` entries are `git log` pathspecs ("pathspec" in the [git glossary](https://git-scm.com/docs/gitglossary)), relative to `GITHUB_WORKSPACE`.
 
-The action reads the repository from `GITHUB_REPOSITORY` and the API addresses from `GITHUB_API_URL` and `GITHUB_GRAPHQL_URL`, which the runner sets. It runs git in `GITHUB_WORKSPACE`, so the repository must be checked out there.
+The action reads `GITHUB_REPOSITORY`, `GITHUB_API_URL`, and `GITHUB_GRAPHQL_URL`, which the runner sets, and runs git in `GITHUB_WORKSPACE`, where the repository must be checked out.
 
 ## Outputs
 
@@ -40,24 +40,24 @@ The action reads the repository from `GITHUB_REPOSITORY` and the API addresses f
 | `commits`       | Number of commits in the release.                                                     |
 | `pull-requests` | JSON array of the pull request numbers found.                                         |
 | `issues`        | JSON array of the issue numbers found.                                                |
-| `commented`     | JSON array of the numbers that received a comment in this run, including any whose labels then failed.                        |
+| `commented`     | JSON array of the numbers that received a comment in this run, including any whose labels then failed.                |
 | `skipped`       | JSON array of the numbers skipped: already commented, filtered, forbidden, not found. |
 | `failed`        | JSON array of the numbers that could not be updated.                                  |
 | `json`          | JSON array with one object per pull request and issue.                                |
 
-Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels`, `status`, and `commented` (whether this run posted the comment). `author` and `labels` are as they were before this run. A filtered or unsuccessful entry also has `detail`, with the filter that matched or the error message. Read it with `fromJSON`.
+Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels` (as before this run), `status`, and `commented` (whether this run posted the comment). A filtered or unsuccessful entry also has `detail`: the filter that matched, or the error. Read it with `fromJSON`.
 
-No outputs are set when the step fails before it has results, for example when `max-targets` is exceeded or the tag is missing.
+A step that fails before it has results, such as on `max-targets` or a missing tag, sets no outputs.
 
 ## Filters
 
-Three inputs leave pull requests and issues out. A filtered one gets no comment and no label, and no request is made for it.
+A filtered pull request or issue gets no comment, no label, and no request.
 
 - `targets` keeps one kind. With `issues`, pull requests are not commented on, but their descriptions are still read to find the issues they close.
-- `skip-labels` matches label names without regard to case. Up to 100 labels are read per pull request or issue.
-- `skip-authors` matches logins without regard to case. A bot matches with or without its `[bot]` suffix, so `dependabot` and `dependabot[bot]` are the same.
+- `skip-labels` matches label names case-insensitively, among the first 100 labels of each target.
+- `skip-authors` matches logins case-insensitively. A bot matches with or without `[bot]`: `dependabot` and `dependabot[bot]` are the same.
 
-Filters apply after `max-targets` is checked, so filtered pull requests and issues count toward the limit.
+Filters apply after the `max-targets` check, so filtered targets count toward the limit.
 
 ## Results
 
@@ -73,9 +73,9 @@ Every pull request and issue ends with one `status`.
 | `not-found`         | GitHub answered 404. Logged as a warning.                                               | no         |
 | `failed`            | Any other error, including a rate limit that outlasted the retries. Logged as an error. | yes        |
 
-A failure on one pull request or issue doesn't stop the others. The step fails at the end, after the outputs and the summary are written. Running the step again is safe: anything that already has the comment is reported as `already-commented`.
+A failure on one target doesn't stop the others. The step fails at the end, after the outputs and summary are written. Re-running is safe: a target that has the comment is `already-commented`.
 
-If a comment is posted and adding labels then fails, the status is `failed` with the label error in `detail`, and the number is in both `commented` and `failed`. The next run finds the comment and only adds the labels.
+If the comment posts and adding labels fails, the status is `failed` with the label error in `detail`, and the number is in both `commented` and `failed`. The next run finds the comment and adds the labels.
 
 ## The comment
 
@@ -87,9 +87,9 @@ The built-in comment follows the wording of [`@semantic-release/github`](https:/
 The release is available on [v1.4.0](https://github.com/acme/widgets/releases/tag/v1.4.0)
 ```
 
-An issue gets "This issue has been resolved in version 1.4.0" instead. The second paragraph is left out when `release-url` is empty.
+An issue gets "This issue has been resolved in version 1.4.0". The second paragraph is omitted when `release-url` is empty.
 
-Set `comment` to use your own text. These placeholders are replaced, and anything else is left as written:
+`comment` replaces the text. These placeholders are filled in, and anything else is posted as written:
 
 | Placeholder | Value                                    |
 |-------------|------------------------------------------|
@@ -98,11 +98,11 @@ Set `comment` to use your own text. These placeholders are replaced, and anythin
 | `{url}`     | The `release-url` input, possibly empty. |
 | `{type}`    | `pull request` or `issue`.               |
 
-Every comment ends with a hidden HTML comment, `<!-- psr-success-comment tag=v1.4.0 -->`. It is how a later run recognizes that the release was already announced, so a comment without it, or with a different tag, doesn't count.
+Every comment ends with a hidden marker, `<!-- psr-success-comment tag=v1.4.0 -->`. A later run uses it to see that the release was announced. A comment without it, or with another tag, doesn't count.
 
 ## Logs, annotations, and failures
 
-The log lists each pull request and issue with a colored dot for its status. The job summary shows the same list as a table with colored circles, because it doesn't render ANSI colors.
+The log lists each target with a colored dot. The job summary shows a table with colored circles, since it doesn't render ANSI colors.
 
 | Color  | Statuses                        |
 |--------|---------------------------------|

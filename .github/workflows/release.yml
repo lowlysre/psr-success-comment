@@ -39,7 +39,7 @@ jobs:
         uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          config_file: releaserc.toml
+          config_file: .github/releaserc.toml
           commit: false
           changelog: false
 

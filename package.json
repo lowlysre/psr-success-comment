@@ -9,11 +9,17 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "node scripts/build.mjs && tpn --ci --no-spinner",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --legal-comments=none --outfile=dist/index.cjs && tpn --ci --no-spinner",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/*.test.ts",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"src/**\" --test-coverage-exclude=\"src/index.ts\" --test-coverage-lines=95 --test-coverage-functions=95 --test-coverage-branches=90 test/*.test.ts",
     "check": "npm run typecheck && npm run test:coverage && npm run build"
+  },
+  "thirdPartyNotices": {
+    "output": "./dist/THIRD_PARTY_LICENSES.txt",
+    "lineEnding": "lf",
+    "overwrite": true,
+    "allowMissing": true
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
