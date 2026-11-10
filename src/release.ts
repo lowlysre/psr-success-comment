@@ -41,6 +41,8 @@ export interface Filters {
 
 export interface Result extends Target {
   status: Status
+  /** True when this run posted the comment, even if a later step, such as adding labels, failed. */
+  commented: boolean
   detail?: string
 }
 
@@ -172,6 +174,7 @@ export async function findClosed(
 /**
  * Comments on and labels each target, one request at a time. A target that already carries this
  * release's marker is not commented on again. 403 and 404 skip the target; other errors mark it failed.
+ * `commented` records whether the comment was posted, whatever happened to the labels afterwards.
  * A target the filters leave out is reported without any request.
  */
 export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[], options: NotifyOptions): Promise<Result[]> {
@@ -182,14 +185,15 @@ export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[
     const issue = `/repos/${owner}/${repo}/issues/${target.number}`
     const filtered = filterReason(target, options.filters)
     if (filtered) {
-      results.push({ ...target, status: 'filtered', detail: filtered })
+      results.push({ ...target, status: 'filtered', commented: false, detail: filtered })
       continue
     }
+    let commented = false
     try {
       const comments = await gh.paginate<{ body?: string | null }>(`${issue}/comments`)
       const exists = comments.some(comment => comment.body?.includes(needle))
       if (options.dryRun) {
-        results.push({ ...target, status: exists ? 'already-commented' : 'would-comment' })
+        results.push({ ...target, status: exists ? 'already-commented' : 'would-comment', commented })
         continue
       }
       if (!exists) {
@@ -200,6 +204,7 @@ export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[
           releaseUrl: options.releaseUrl
         })
         await gh.request('POST', `${issue}/comments`, { body })
+        commented = true
         await options.pause()
       }
       if (options.labels.length > 0) {
@@ -207,10 +212,15 @@ export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[
         await gh.request('POST', `${issue}/labels`, { labels: options.labels }, { retry: true })
         await options.pause()
       }
-      results.push({ ...target, status: exists ? 'already-commented' : 'commented' })
+      results.push({ ...target, status: exists ? 'already-commented' : 'commented', commented })
     } catch (err) {
       const code = err instanceof HttpError && !err.rateLimited ? err.status : 0
-      results.push({ ...target, status: code === 403 ? 'forbidden' : code === 404 ? 'not-found' : 'failed', detail: errorMessage(err) })
+      results.push({
+        ...target,
+        status: code === 403 ? 'forbidden' : code === 404 ? 'not-found' : 'failed',
+        commented,
+        detail: errorMessage(err)
+      })
     }
   }
   return results

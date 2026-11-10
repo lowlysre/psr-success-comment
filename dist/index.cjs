@@ -21100,6 +21100,7 @@ async function isShallow(git) {
   return (await git(["rev-parse", "--is-shallow-repository"])).trim() === "true";
 }
 var isPrerelease = (version) => /^\d+\.\d+\.\d+-/.test(version);
+var VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 function tagGlobs(tag, version) {
   const at = version ? tag.lastIndexOf(version) : -1;
   if (at < 0) return void 0;
@@ -21113,6 +21114,7 @@ async function previousTag(git, tag, version) {
   if (!globs) {
     throw new Error(`Tag '${tag}' does not contain version '${version}', so the previous tag can't be derived. Set 'previous-tag'.`);
   }
+  const strict = VERSION.test(version);
   const skipped = [];
   for (; ; ) {
     let found;
@@ -21124,7 +21126,8 @@ async function previousTag(git, tag, version) {
       throw err;
     }
     const foundVersion = found.slice(globs.prefixLength, found.length - globs.suffixLength);
-    if (isPrerelease(version) || !isPrerelease(foundVersion)) return found;
+    const skip = strict && !VERSION.test(foundVersion) || !isPrerelease(version) && isPrerelease(foundVersion);
+    if (!skip) return found;
     skipped.push(found);
   }
 }
@@ -21358,14 +21361,15 @@ async function notify(gh, { owner, repo }, targets, options) {
     const issue2 = `/repos/${owner}/${repo}/issues/${target.number}`;
     const filtered = filterReason(target, options.filters);
     if (filtered) {
-      results.push({ ...target, status: "filtered", detail: filtered });
+      results.push({ ...target, status: "filtered", commented: false, detail: filtered });
       continue;
     }
+    let commented = false;
     try {
       const comments = await gh.paginate(`${issue2}/comments`);
       const exists2 = comments.some((comment) => comment.body?.includes(needle));
       if (options.dryRun) {
-        results.push({ ...target, status: exists2 ? "already-commented" : "would-comment" });
+        results.push({ ...target, status: exists2 ? "already-commented" : "would-comment", commented });
         continue;
       }
       if (!exists2) {
@@ -21376,16 +21380,22 @@ async function notify(gh, { owner, repo }, targets, options) {
           releaseUrl: options.releaseUrl
         });
         await gh.request("POST", `${issue2}/comments`, { body });
+        commented = true;
         await options.pause();
       }
       if (options.labels.length > 0) {
         await gh.request("POST", `${issue2}/labels`, { labels: options.labels }, { retry: true });
         await options.pause();
       }
-      results.push({ ...target, status: exists2 ? "already-commented" : "commented" });
+      results.push({ ...target, status: exists2 ? "already-commented" : "commented", commented });
     } catch (err) {
       const code = err instanceof HttpError && !err.rateLimited ? err.status : 0;
-      results.push({ ...target, status: code === 403 ? "forbidden" : code === 404 ? "not-found" : "failed", detail: errorMessage(err) });
+      results.push({
+        ...target,
+        status: code === 403 ? "forbidden" : code === 404 ? "not-found" : "failed",
+        commented,
+        detail: errorMessage(err)
+      });
     }
   }
   return results;
@@ -21494,7 +21504,7 @@ function publish({ base, commits, results }) {
   );
   setOutput(
     "commented",
-    numbers((r) => r.status === "commented")
+    numbers((r) => r.commented)
   );
   setOutput(
     "skipped",

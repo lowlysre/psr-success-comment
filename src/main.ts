@@ -170,7 +170,7 @@ function publish({ base, commits, results }: Release): void {
   )
   core.setOutput(
     'commented',
-    numbers(r => r.status === 'commented')
+    numbers(r => r.commented)
   )
   core.setOutput(
     'skipped',

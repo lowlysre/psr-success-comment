@@ -40,12 +40,12 @@ The action reads the repository from `GITHUB_REPOSITORY` and the API addresses f
 | `commits`       | Number of commits in the release.                                                     |
 | `pull-requests` | JSON array of the pull request numbers found.                                         |
 | `issues`        | JSON array of the issue numbers found.                                                |
-| `commented`     | JSON array of the numbers that received a comment in this run.                        |
+| `commented`     | JSON array of the numbers that received a comment in this run, including any whose labels then failed.                        |
 | `skipped`       | JSON array of the numbers skipped: already commented, filtered, forbidden, not found. |
 | `failed`        | JSON array of the numbers that could not be updated.                                  |
 | `json`          | JSON array with one object per pull request and issue.                                |
 
-Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels`, and `status`. `author` and `labels` are as they were before this run. A filtered or unsuccessful entry also has `detail`, with the filter that matched or the error message. Read it with `fromJSON`.
+Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels`, `status`, and `commented` (whether this run posted the comment). `author` and `labels` are as they were before this run. A filtered or unsuccessful entry also has `detail`, with the filter that matched or the error message. Read it with `fromJSON`.
 
 No outputs are set when the step fails before it has results, for example when `max-targets` is exceeded or the tag is missing.
 
@@ -75,7 +75,7 @@ Every pull request and issue ends with one `status`.
 
 A failure on one pull request or issue doesn't stop the others. The step fails at the end, after the outputs and the summary are written. Running the step again is safe: anything that already has the comment is reported as `already-commented`.
 
-If a comment is posted and adding labels then fails, the status describes the label failure. The next run finds the comment and only adds the labels.
+If a comment is posted and adding labels then fails, the status is `failed` with the label error in `detail`, and the number is in both `commented` and `failed`. The next run finds the comment and only adds the labels.
 
 ## The comment
 

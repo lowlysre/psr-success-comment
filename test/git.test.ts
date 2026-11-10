@@ -36,6 +36,8 @@ describe('previousTag with unusual tags', () => {
     git = gitIn(repo.dir)
     repo.commit('feat: one')
     repo.tag('v1.0.0+build-5')
+    repo.commit('feat: lib')
+    repo.tag('vlib-9.0.0')
     repo.commit('feat: two')
     repo.tag('v1.1.0-rc.1')
     repo.commit('fix: three')
@@ -50,6 +52,17 @@ describe('previousTag with unusual tags', () => {
   it('treats a hyphen in build metadata as part of a full release, not a pre-release', async () => {
     assert.equal(await previousTag(git, 'v1.1.0', '1.1.0'), 'v1.0.0+build-5')
     assert.equal(await previousTag(git, 'v1.1.1+build-9', '1.1.1+build-9'), 'v1.1.0')
+  })
+
+  it("skips another package's tag that only matches the glob", async () => {
+    assert.equal(await previousTag(git, 'v1.1.0', '1.1.0'), 'v1.0.0+build-5')
+    assert.equal(await previousTag(git, 'v1.1.0-rc.1', '1.1.0-rc.1'), 'v1.0.0+build-5')
+  })
+
+  it('accepts any matching tag when the version is not SemVer', async () => {
+    repo.commit('chore: next')
+    repo.tag('v9.9')
+    assert.equal(await previousTag(git, 'v9.9', '9.9'), 'v1.1.1+build-9')
   })
 
   it('compares a pre-release with the nearest tag of either kind', async () => {

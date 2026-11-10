@@ -282,6 +282,42 @@ describe('notify', () => {
     assert.equal(fake.labels.has(10), false)
   })
 
+  it('reports a posted comment even when adding the labels fails', async () => {
+    fake.canned.set('POST /repos/acme/widgets/issues/10/labels', [{ status: 422, body: { message: 'Validation Failed' } }])
+    const results = await notify(fake.gh, repo, targets, options())
+    assert.deepEqual(
+      results.map(result => [result.status, result.commented]),
+      [
+        ['failed', true],
+        ['commented', true]
+      ]
+    )
+    assert.equal(fake.comments.get(10)?.length, 1)
+  })
+
+  it('reports no comment when posting it fails, or when the target is filtered, already commented, or a dry run', async () => {
+    fake.canned.set('POST /repos/acme/widgets/issues/10/comments', [{ status: 422, body: { message: 'Validation Failed' } }])
+    assert.deepEqual(
+      (await notify(fake.gh, repo, [targets[0] as Target], options())).map(result => result.commented),
+      [false]
+    )
+    assert.deepEqual(
+      (await notify(fake.gh, repo, targets, options({ dryRun: true }))).map(result => result.commented),
+      [false, false]
+    )
+    assert.deepEqual(
+      (await notify(fake.gh, repo, targets, options({ filters: { ...noFilters, skipLabels: ['bug'], skipAuthors: ['dependabot'] } }))).map(
+        result => result.commented
+      ),
+      [false, false]
+    )
+    await notify(fake.gh, repo, targets, options())
+    assert.deepEqual(
+      (await notify(fake.gh, repo, targets, options())).map(result => result.commented),
+      [false, false]
+    )
+  })
+
   it('marks other errors failed, including an exhausted rate limit, and carries on', async () => {
     fake.canned.set('POST /repos/acme/widgets/issues/10/comments', [{ status: 422, body: { message: 'Validation Failed' } }])
     fake.canned.set('POST /repos/acme/widgets/issues/1/labels', [{ status: 403, headers: { 'retry-after': '9999' } }])

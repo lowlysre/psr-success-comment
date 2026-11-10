@@ -39,6 +39,9 @@ export async function isShallow(git: Git): Promise<boolean> {
 /** A SemVer pre-release has a hyphen straight after the patch number (https://semver.org/#spec-item-9). */
 export const isPrerelease = (version: string): boolean => /^\d+\.\d+\.\d+-/.test(version)
 
+/** A complete SemVer version, with optional pre-release and build metadata (https://semver.org/#semantic-versioning-200). */
+const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
+
 /**
  * A glob for the tags that share this tag's format, found by swapping the version for a wildcard:
  * tag `pkg-v1.2.3` with version `1.2.3` gives `pkg-v*.*.*`. The two dots keep out partial tags such as
@@ -57,13 +60,15 @@ export function tagGlobs(tag: string, version: string): { all: string; prefixLen
  * The nearest tag of the same format in the history before `tag`. A full release skips pre-release
  * tags, so its range covers everything since the last full release. Undefined on a first release.
  * Tags are classified by the version inside them, so a hyphen in build metadata (`1.0.0+build-5`) is
- * not mistaken for a pre-release.
+ * not mistaken for a pre-release. When `version` is itself a SemVer version, a match whose version part
+ * is not one, such as another package's `vlib-9.0.0` matching `v*.*.*`, is skipped too.
  */
 export async function previousTag(git: Git, tag: string, version: string): Promise<string | undefined> {
   const globs = tagGlobs(tag, version)
   if (!globs) {
     throw new Error(`Tag '${tag}' does not contain version '${version}', so the previous tag can't be derived. Set 'previous-tag'.`)
   }
+  const strict = VERSION.test(version)
   const skipped: string[] = []
   for (;;) {
     let found: string
@@ -75,7 +80,8 @@ export async function previousTag(git: Git, tag: string, version: string): Promi
       throw err
     }
     const foundVersion = found.slice(globs.prefixLength, found.length - globs.suffixLength)
-    if (isPrerelease(version) || !isPrerelease(foundVersion)) return found
+    const skip = (strict && !VERSION.test(foundVersion)) || (!isPrerelease(version) && isPrerelease(foundVersion))
+    if (!skip) return found
     skipped.push(found)
   }
 }

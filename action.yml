@@ -77,7 +77,7 @@ outputs:
   failed:
     description: 'JSON array of the numbers that could not be updated.'
   json:
-    description: 'JSON array with the number, kind, url, author, labels, status, and detail of every pull request and issue.'
+    description: 'JSON array with the number, kind, url, author, labels, status, commented, and detail of every pull request and issue.'
 
 runs:
   using: 'node24'

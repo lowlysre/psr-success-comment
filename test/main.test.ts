@@ -120,9 +120,9 @@ describe('run', () => {
       skipped: '[]',
       failed: '[]',
       json: JSON.stringify([
-        { number: 1, kind: 'issue', url: urlOf(1, false), author: '', labels: ['bug'], status: 'commented' },
-        { number: 2, kind: 'issue', url: urlOf(2, false), author: '', labels: [], status: 'commented' },
-        { number: 10, kind: 'pr', url: urlOf(10, true), author: 'octocat', labels: [], status: 'commented' }
+        { number: 1, kind: 'issue', url: urlOf(1, false), author: '', labels: ['bug'], status: 'commented', commented: true },
+        { number: 2, kind: 'issue', url: urlOf(2, false), author: '', labels: [], status: 'commented', commented: true },
+        { number: 10, kind: 'pr', url: urlOf(10, true), author: 'octocat', labels: [], status: 'commented', commented: true }
       ])
     })
     for (const number of [1, 2, 10]) {
@@ -231,6 +231,15 @@ describe('run', () => {
     assert.match(stdout, /::error::Failed to update #2\. Re-running is safe/)
     assert.match(readFileSync(summaryFile, 'utf8'), /🔴 failed/)
     assert.match(readFileSync(summaryFile, 'utf8'), /<th>Detail<\/th>.*<td>–<\/td>.*422: Validation Failed/s)
+  })
+
+  it('lists a target in commented when the comment was posted but the labels failed', async () => {
+    fake.canned.set('POST /repos/acme/widgets/issues/2/labels', [{ status: 422, body: { message: 'Validation Failed' } }])
+    await run(inputs(), deps())
+    assert.equal(process.exitCode, 1)
+    assert.equal(readOutputs().failed, '[2]')
+    assert.equal(readOutputs().commented, '[1,2,10]')
+    assert.match(stdout, /Failed to update #2\. Re-running is safe/)
   })
 
   it('writes a job summary when enabled and skips it when disabled', async () => {
