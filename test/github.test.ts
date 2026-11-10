@@ -156,7 +156,13 @@ describe('GitHub client', () => {
     const query = 'query { repository { i1: issueOrPullRequest(number: 1) { number } i9: issueOrPullRequest(number: 9) { number } } }'
     const data = await fake.gh.graphql<{ repository: Record<string, unknown> }>(query, {})
     assert.equal(data.repository.i9, null)
-    assert.deepEqual(data.repository.i1, { __typename: 'Issue', number: 1, url: 'https://github.test/acme/widgets/issues/1' })
+    assert.deepEqual(data.repository.i1, {
+      __typename: 'Issue',
+      number: 1,
+      url: 'https://github.test/acme/widgets/issues/1',
+      author: null,
+      labels: { nodes: [] }
+    })
   })
 
   it('throws on any other GraphQL error, or on missing data', async () => {

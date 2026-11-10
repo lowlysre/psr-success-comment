@@ -83,7 +83,10 @@ export interface FakeGitHub {
   /** Pull request numbers that GitHub associates with each commit SHA. */
   associated: Map<string, number[]>
   comments: Map<number, string[]>
+  /** Labels by pull request or issue number: read by lookups, added to by the labels endpoint. */
   labels: Map<number, string[]>
+  /** Author logins by pull request or issue number. */
+  authors: Map<number, string>
   /** Canned responses, keyed by "METHOD /path", returned once each before the normal behavior. */
   canned: Map<string, Canned[]>
   pageSize: number
@@ -102,13 +105,21 @@ export async function fakeGitHub(): Promise<FakeGitHub> {
     associated: new Map<string, number[]>(),
     comments: new Map<number, string[]>(),
     labels: new Map<number, string[]>(),
+    authors: new Map<number, string>(),
     canned: new Map<string, Canned[]>(),
     pageSize: 100
   }
 
+  const node = (number: number, pr: boolean) => ({
+    number,
+    url: urlOf(number, pr),
+    author: fake.authors.has(number) ? { login: fake.authors.get(number) } : null,
+    labels: { nodes: (fake.labels.get(number) ?? []).map(name => ({ name })) }
+  })
+
   const prNode = (number: number) => {
     const pr = fake.prs.get(number) as FakePullRequest
-    return { number, url: urlOf(number, true), body: pr.body ?? null, mergeCommit: pr.merge ? { oid: pr.merge } : null }
+    return { ...node(number, true), body: pr.body ?? null, mergeCommit: pr.merge ? { oid: pr.merge } : null }
   }
 
   const prPage = (sha: string, cursor: string | null) => {
@@ -134,7 +145,7 @@ export async function fakeGitHub(): Promise<FakeGitHub> {
       const number = Number(digits)
       const pr = fake.prs.has(number)
       if (pr || fake.issues.has(number)) {
-        repository[alias as string] = { __typename: pr ? 'PullRequest' : 'Issue', number, url: urlOf(number, pr) }
+        repository[alias as string] = { __typename: pr ? 'PullRequest' : 'Issue', ...node(number, pr) }
       } else {
         repository[alias as string] = null
         errors.push({ type: 'NOT_FOUND', message: `Could not resolve to an issue or pull request with the number of ${number}.` })

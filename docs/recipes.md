@@ -6,6 +6,7 @@ Each recipe assumes the PSR step has `id: release` and the job has the [permissi
 - [Write your own comment](#write-your-own-comment)
 - [Label pre-releases differently](#label-pre-releases-differently)
 - [Comment without labeling](#comment-without-labeling)
+- [Leave some pull requests and issues alone](#leave-some-pull-requests-and-issues-alone)
 - [Release packages from a monorepo](#release-packages-from-a-monorepo)
 - [Use the results in later steps](#use-the-results-in-later-steps)
 - [Announce a large or first release](#announce-a-large-or-first-release)
@@ -67,6 +68,27 @@ A pull request that ships in `1.4.0-rc.1` and then in `1.4.0` is commented on fo
     version: ${{ steps.release.outputs.version }}
     labels: ''
 ```
+
+## Leave some pull requests and issues alone
+
+`skip-authors` and `skip-labels` keep the action away from pull requests and issues nobody needs to hear about, such as dependency updates. `targets` limits it to one kind.
+
+```yaml
+- uses: lowlysre/psr-success-comment@v1
+  if: steps.release.outputs.released == 'true'
+  with:
+    tag: ${{ steps.release.outputs.tag }}
+    version: ${{ steps.release.outputs.version }}
+    targets: issues
+    skip-authors: |
+      dependabot[bot]
+      renovate[bot]
+    skip-labels: |
+      skip-release-comment
+      internal
+```
+
+With `targets: issues`, a pull request gets no comment, but an issue it closes with `Fixes #12` still does. Filtered pull requests and issues appear in the log and summary as `filtered`, with the filter that matched. See [filters](reference.md#filters).
 
 ## Release packages from a monorepo
 

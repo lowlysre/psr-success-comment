@@ -54,7 +54,7 @@ Issues linked to a pull request from the sidebar, without a keyword, are not fou
 
 Source: `notify` in [`src/release.ts`](../src/release.ts) and [`src/github.ts`](../src/github.ts). Tests: [`test/release.test.ts`](../test/release.test.ts), [`test/github.test.ts`](../test/github.test.ts).
 
-For each pull request and issue, in number order, the action:
+Pull requests and issues left out by the [filters](reference.md#filters) are reported as `filtered` and skipped. For each of the others, in number order, the action:
 
 1. Lists the existing comments and looks for this release's [marker](reference.md#the-comment).
 2. Posts the comment if the marker isn't there.
@@ -83,12 +83,14 @@ Requests follow [GitHub's REST best practices](https://docs.github.com/en/rest/u
 | Size guard       | None                                                                        | `max-targets`, 100 by default                |
 | Slug matching    | `owner/repo#1` must match exactly (L158-L160)                               | Case-insensitive                             |
 
-Not ported: `successCommentCondition` (L196-L203), closing "release is failing" issues (L266-L303), and `addReleases` (L305-L328).
+`successCommentCondition` (L196-L203) is a Lodash template evaluated against each pull request or issue. This action has the [`targets`, `skip-labels`, and `skip-authors`](reference.md#filters) inputs instead, which evaluate no code.
+
+Not ported: closing "release is failing" issues (L266-L303), and `addReleases` (L305-L328).
 
 ## What is tested
 
 - `npm test` runs the suite. git behavior runs against real repositories created in a temporary directory. API behavior runs against a local HTTP server that stands in for GitHub's REST and GraphQL APIs ([`test/helpers.ts`](../test/helpers.ts)).
-- The shape of GitHub's GraphQL answers was checked against the live API on 2026-11-10: `associatedPullRequests` with `mergeCommit`, and `issueOrPullRequest` returning `null` with a `NOT_FOUND` error for a number that doesn't exist. The test server reproduces both.
+- The shape of GitHub's GraphQL answers was checked against the live API on 2026-11-10: `associatedPullRequests` with `mergeCommit`, a bot author's login coming back without its `[bot]` suffix (`dependabot`, where REST gives `dependabot[bot]`), and `issueOrPullRequest` returning `null` with a `NOT_FOUND` error for a number that doesn't exist. The test server reproduces both.
 - A dry run of the built action against a clone of `python-semantic-release/python-semantic-release` for tag `v10.7.0`, on 2026-11-10, found 24 commits since `v10.6.2`, 15 pull requests, and 2 issues.
 
 ## What is not tested

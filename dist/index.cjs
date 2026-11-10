@@ -20460,10 +20460,10 @@ var require_issue_parser = __commonJS({
         `The ${[parentOpt, opt].filter(Boolean).join(".")} property must be a String or an array of Strings`
       );
     }
-    function normalize(options, parentOpt) {
+    function normalize2(options, parentOpt) {
       for (const opt of Object.keys(options)) {
         if (!parentOpt && opt === "actions") {
-          normalize(options[opt], opt);
+          normalize2(options[opt], opt);
         } else {
           if (!options[opt]) {
             options[opt] = [];
@@ -20501,7 +20501,7 @@ var require_issue_parser = __commonJS({
         ...overrides,
         actions: { ...hostConfig.default.actions, ...options.actions, ...overrides.actions }
       };
-      normalize(mergedOptions);
+      normalize2(mergedOptions);
       mergedOptions.hosts = mergedOptions.hosts.map(addTrailingSlash);
       mergedOptions.issueURLSegments = mergedOptions.issueURLSegments.map(addLeadingAndTrailingSlash);
       const regexp = buildRegexp(mergedOptions);
@@ -21065,6 +21065,7 @@ var TONES = {
   commented: "ok",
   "already-commented": "idle",
   "would-comment": "busy",
+  filtered: "idle",
   forbidden: "warn",
   "not-found": "warn",
   failed: "fail"
@@ -21250,10 +21251,26 @@ function describe(text) {
 
 // src/release.ts
 var CHUNK = 100;
-var PAGE = "associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { number url body mergeCommit { oid } } }";
+var NODE = "number url author { login } labels(first: 100) { nodes { name } }";
+var PAGE = `associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`;
 var NEXT_PAGE = `query($owner: String!, $repo: String!, $sha: GitObjectID!, $cursor: String) {
   repository(owner: $owner, name: $repo) { commit: object(oid: $sha) { ... on Commit { ${PAGE} } } }
 }`;
+var toTarget = (node, kind) => ({
+  number: node.number,
+  kind,
+  url: node.url,
+  author: node.author?.login ?? "",
+  labels: node.labels?.nodes.map((label2) => label2.name) ?? []
+});
+var normalize = (name) => name.toLowerCase().replace(/\[bot\]$/, "");
+function filterReason(target, { targets, skipLabels, skipAuthors }) {
+  if (targets !== "all" && targets === "pull-requests" !== (target.kind === "pr")) return `targets is '${targets}'`;
+  const label2 = target.labels.find((name) => skipLabels.some((skip) => normalize(skip) === normalize(name)));
+  if (label2) return `label '${label2}'`;
+  if (target.author && skipAuthors.some((skip) => normalize(skip) === normalize(target.author))) return `author '${target.author}'`;
+  return void 0;
+}
 function* chunks(items, size) {
   for (let i = 0; i < items.length; i += size) yield items.slice(i, i + size);
 }
@@ -21296,7 +21313,7 @@ async function findClosed(gh, { owner, repo }, texts, parse, known) {
   const numbers = [...new Set(texts.flatMap(parse))].filter((number) => !known.has(number)).sort((a, b) => a - b);
   const targets = [];
   for (const chunk of chunks(numbers, CHUNK)) {
-    const fields = chunk.map((n) => `i${n}: issueOrPullRequest(number: ${n}) { __typename ... on Issue { number url } ... on PullRequest { number url } }`).join("\n");
+    const fields = chunk.map((n) => `i${n}: issueOrPullRequest(number: ${n}) { __typename ... on Issue { ${NODE} } ... on PullRequest { ${NODE} } }`).join("\n");
     const query = `query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) {
 ${fields}
 } }`;
@@ -21306,7 +21323,7 @@ ${fields}
     });
     for (const number of chunk) {
       const node = repository[`i${number}`];
-      if (node) targets.push({ number: node.number, url: node.url, kind: node.__typename === "PullRequest" ? "pr" : "issue" });
+      if (node) targets.push(toTarget(node, node.__typename === "PullRequest" ? "pr" : "issue"));
     }
   }
   return targets;
@@ -21316,6 +21333,11 @@ async function notify(gh, { owner, repo }, targets, options) {
   const needle = marker(options.tag);
   for (const target of targets) {
     const issue2 = `/repos/${owner}/${repo}/issues/${target.number}`;
+    const filtered = filterReason(target, options.filters);
+    if (filtered) {
+      results.push({ ...target, status: "filtered", detail: filtered });
+      continue;
+    }
     try {
       const comments = await gh.paginate(`${issue2}/comments`);
       const exists2 = comments.some((comment) => comment.body?.includes(needle));
@@ -21348,10 +21370,13 @@ async function notify(gh, { owner, repo }, targets, options) {
 
 // src/main.ts
 var WRITE_PAUSE_MS = 1e3;
+var TARGET_KINDS = ["all", "pull-requests", "issues"];
 var lines = (text) => text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 function readInputs(env = process.env) {
   const maxTargets = getInput("max-targets").trim();
   if (!/^\d+$/.test(maxTargets)) throw new Error(`Invalid 'max-targets' '${maxTargets}': it must be a whole number, with 0 for no limit.`);
+  const targets = getInput("targets").trim() || "all";
+  if (!TARGET_KINDS.includes(targets)) throw new Error(`Invalid 'targets' '${targets}': it must be ${TARGET_KINDS.join(", ")}.`);
   const token = getInput("token", { required: true });
   setSecret(token);
   return {
@@ -21362,6 +21387,11 @@ function readInputs(env = process.env) {
     paths: lines(getInput("paths")),
     comment: getInput("comment"),
     labels: lines(getInput("labels")),
+    filters: {
+      targets,
+      skipLabels: lines(getInput("skip-labels")),
+      skipAuthors: lines(getInput("skip-authors"))
+    },
     token,
     dryRun: getBooleanInput("dry-run"),
     maxTargets: Number.parseInt(maxTargets, 10),
@@ -21425,7 +21455,7 @@ async function findTargets(gh, repo, commits, serverUrl) {
   const prs = await findPullRequests(gh, repo, commits);
   const texts = [...prs.map((pr) => pr.body ?? ""), ...commits.map((commit) => commit.message)];
   const closed = await findClosed(gh, repo, texts, closingParser(repo.owner, repo.repo, serverUrl), new Set(prs.map((pr) => pr.number)));
-  return [...prs.map(({ number, url }) => ({ number, url, kind: "pr" })), ...closed].sort((a, b) => a.number - b.number);
+  return [...prs.map((pr) => toTarget(pr, "pr")), ...closed].sort((a, b) => a.number - b.number);
 }
 function publish({ base, commits, results }) {
   const numbers = (keep) => JSON.stringify(results.filter(keep).map((result) => result.number));
@@ -21445,7 +21475,7 @@ function publish({ base, commits, results }) {
   );
   setOutput(
     "skipped",
-    numbers((r) => r.status === "already-commented" || r.status === "forbidden" || r.status === "not-found")
+    numbers((r) => ["already-commented", "filtered", "forbidden", "not-found"].includes(r.status))
   );
   setOutput(
     "failed",
@@ -21458,7 +21488,9 @@ function log({ tag, dryRun }, { results }) {
   if (dryRun) notice("Dry run: no comments or labels were written.", { title: "psr-success-comment" });
   if (results.length === 0) info(dim("No pull requests or issues to update."));
   for (const result of results) {
-    info(`${logStatus(result.status).padEnd(28)} ${label(result).padEnd(12)} ${dim(result.url)}`);
+    info(
+      `${logStatus(result.status).padEnd(28)} ${label(result).padEnd(12)} ${dim(result.url)}${result.status === "filtered" ? dim(` (${result.detail})`) : ""}`
+    );
     if (result.status === "forbidden" || result.status === "not-found") {
       warning(`Skipped ${label(result)} for ${tag}: ${result.detail}`, { title: "Release comment skipped" });
     } else if (result.status === "failed") {

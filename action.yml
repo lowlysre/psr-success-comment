@@ -32,6 +32,18 @@ inputs:
     description: 'Labels, one per line, to add to each pull request and issue. Set to an empty string to add none.'
     required: false
     default: 'released'
+  targets:
+    description: 'Which kinds to comment on and label: `all`, `pull-requests`, or `issues`.'
+    required: false
+    default: 'all'
+  skip-labels:
+    description: 'Labels, one per line. Pull requests and issues that have any of them are left alone.'
+    required: false
+    default: ''
+  skip-authors:
+    description: 'Author logins, one per line. Pull requests and issues they opened are left alone.'
+    required: false
+    default: ''
   max-targets:
     description: 'Fail without writing anything when more pull requests and issues than this are found. 0 for no limit.'
     required: false
@@ -61,11 +73,11 @@ outputs:
   commented:
     description: 'JSON array of the numbers that received a comment in this run.'
   skipped:
-    description: 'JSON array of the numbers skipped: already commented, forbidden, or not found.'
+    description: 'JSON array of the numbers skipped: already commented, filtered, forbidden, or not found.'
   failed:
     description: 'JSON array of the numbers that could not be updated.'
   json:
-    description: 'JSON array with the number, kind, url, status, and detail of every pull request and issue.'
+    description: 'JSON array with the number, kind, url, author, labels, status, and detail of every pull request and issue.'
 
 runs:
   using: 'node24'

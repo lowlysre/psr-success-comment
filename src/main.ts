@@ -3,7 +3,17 @@ import { closingParser } from './comment.ts'
 import { dim, escapeHtml, logStatus, paint, plural, summaryStatus } from './format.ts'
 import { gitIn, isShallow, listCommits, previousTag, tagExists, type Commit, type Git } from './git.ts'
 import { errorMessage, GitHub } from './github.ts'
-import { findClosed, findPullRequests, notify, type Repo, type Result, type Target } from './release.ts'
+import {
+  findClosed,
+  findPullRequests,
+  notify,
+  toTarget,
+  type Filters,
+  type Repo,
+  type Result,
+  type Target,
+  type TargetKinds
+} from './release.ts'
 
 export { errorMessage }
 
@@ -15,6 +25,7 @@ export interface Inputs {
   paths: string[]
   comment: string
   labels: string[]
+  filters: Filters
   token: string
   dryRun: boolean
   maxTargets: number
@@ -36,6 +47,8 @@ export interface Deps {
 // https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api#pause-between-mutative-requests
 const WRITE_PAUSE_MS = 1000
 
+const TARGET_KINDS: string[] = ['all', 'pull-requests', 'issues'] satisfies TargetKinds[]
+
 const lines = (text: string): string[] =>
   text
     .split(/\r?\n/)
@@ -45,6 +58,8 @@ const lines = (text: string): string[] =>
 export function readInputs(env: NodeJS.ProcessEnv = process.env): Inputs {
   const maxTargets = core.getInput('max-targets').trim()
   if (!/^\d+$/.test(maxTargets)) throw new Error(`Invalid 'max-targets' '${maxTargets}': it must be a whole number, with 0 for no limit.`)
+  const targets = core.getInput('targets').trim() || 'all'
+  if (!TARGET_KINDS.includes(targets)) throw new Error(`Invalid 'targets' '${targets}': it must be ${TARGET_KINDS.join(', ')}.`)
   const token = core.getInput('token', { required: true })
   core.setSecret(token)
   return {
@@ -55,6 +70,11 @@ export function readInputs(env: NodeJS.ProcessEnv = process.env): Inputs {
     paths: lines(core.getInput('paths')),
     comment: core.getInput('comment'),
     labels: lines(core.getInput('labels')),
+    filters: {
+      targets: targets as TargetKinds,
+      skipLabels: lines(core.getInput('skip-labels')),
+      skipAuthors: lines(core.getInput('skip-authors'))
+    },
     token,
     dryRun: core.getBooleanInput('dry-run'),
     maxTargets: Number.parseInt(maxTargets, 10),
@@ -133,7 +153,7 @@ async function findTargets(gh: GitHub, repo: Repo, commits: Commit[], serverUrl:
   const prs = await findPullRequests(gh, repo, commits)
   const texts = [...prs.map(pr => pr.body ?? ''), ...commits.map(commit => commit.message)]
   const closed = await findClosed(gh, repo, texts, closingParser(repo.owner, repo.repo, serverUrl), new Set(prs.map(pr => pr.number)))
-  return [...prs.map(({ number, url }): Target => ({ number, url, kind: 'pr' })), ...closed].sort((a, b) => a.number - b.number)
+  return [...prs.map(pr => toTarget(pr, 'pr')), ...closed].sort((a, b) => a.number - b.number)
 }
 
 function publish({ base, commits, results }: Release): void {
@@ -154,7 +174,7 @@ function publish({ base, commits, results }: Release): void {
   )
   core.setOutput(
     'skipped',
-    numbers(r => r.status === 'already-commented' || r.status === 'forbidden' || r.status === 'not-found')
+    numbers(r => ['already-commented', 'filtered', 'forbidden', 'not-found'].includes(r.status))
   )
   core.setOutput(
     'failed',
@@ -170,7 +190,9 @@ function log({ tag, dryRun }: Inputs, { results }: Release): void {
   if (results.length === 0) core.info(dim('No pull requests or issues to update.'))
 
   for (const result of results) {
-    core.info(`${logStatus(result.status).padEnd(28)} ${label(result).padEnd(12)} ${dim(result.url)}`)
+    core.info(
+      `${logStatus(result.status).padEnd(28)} ${label(result).padEnd(12)} ${dim(result.url)}${result.status === 'filtered' ? dim(` (${result.detail})`) : ''}`
+    )
     if (result.status === 'forbidden' || result.status === 'not-found') {
       core.warning(`Skipped ${label(result)} for ${tag}: ${result.detail}`, { title: 'Release comment skipped' })
     } else if (result.status === 'failed') {
@@ -191,7 +213,7 @@ async function writeSummary({ tag, releaseUrl, dryRun }: Inputs, { base, commits
   if (results.length === 0) {
     summary.addRaw('No pull requests or issues to update.', true)
   } else {
-    // The Detail column only appears when something went wrong.
+    // The Detail column only appears when a target was filtered out or something went wrong.
     const detail = results.some(result => result.detail)
     const header = ['Target', 'Result', ...(detail ? ['Detail'] : [])].map(data => ({ data, header: true }))
     summary.addTable([

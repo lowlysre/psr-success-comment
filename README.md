@@ -80,6 +80,9 @@ Only `tag` and `version` are required. The most useful optional inputs:
 | `release-url`  |            | Release page to link from the comment.                               |
 | `labels`       | `released` | Labels to add, one per line. Empty adds none.                        |
 | `comment`      | built in   | Your own comment text, with `{version}`, `{tag}`, `{url}`, `{type}`. |
+| `targets`      | `all`      | Comment on `all`, only `pull-requests`, or only `issues`.            |
+| `skip-labels`  |            | Leave alone anything carrying one of these labels.                   |
+| `skip-authors` |            | Leave alone anything opened by one of these logins, such as bots.    |
 | `paths`        |            | Limit the release to commits touching these paths, for monorepos.    |
 | `previous-tag` | derived    | Override the tag the release is compared with.                       |
 | `max-targets`  | `100`      | Stop before writing when more pull requests and issues are found.    |
@@ -91,17 +94,17 @@ Outputs are JSON arrays of numbers: `pull-requests`, `issues`, `commented`, `ski
 
 The behaviors on the left are read from the plugin's source at commit [`30e351e`](https://github.com/semantic-release/github/tree/30e351e9378ca93c88d064ad047bb102019f8993).
 
-| `@semantic-release/github` `success`                                                         | This action                                       |
-|----------------------------------------------------------------------------------------------|---------------------------------------------------|
-| Comments on the release's pull requests and the issues they close                            | ✅ Same lookups and the same keyword parser        |
-| Adds the `released` label                                                                    | ✅ `labels` input                                  |
-| Custom comment through a Lodash template                                                     | ✅ `comment` input with four placeholders, no code |
-| Skips a pull request or issue on 403 or 404, and fails on other errors after trying the rest | ✅ Same                                            |
-| Posts again when the step runs again                                                         | ✅ Skips anything that already has the comment     |
-| Sends every comment at once                                                                  | ✅ One request at a time, a second between writes  |
-| `successCommentCondition` to filter by pull request or issue fields                          | ❌ Not ported                                      |
-| Closes the "release is failing" issue, and links other release channels (`addReleases`)      | ❌ Not ported                                      |
-| `released on @channel` label for channel releases                                            | ❌ Not ported, set `labels` yourself               |
+| `@semantic-release/github` `success`                                                         | This action                                         |
+|----------------------------------------------------------------------------------------------|-----------------------------------------------------|
+| Comments on the release's pull requests and the issues they close                            | ✅ Same lookups and the same keyword parser          |
+| Adds the `released` label                                                                    | ✅ `labels` input                                    |
+| Custom comment through a Lodash template                                                     | ✅ `comment` input with four placeholders, no code   |
+| Skips a pull request or issue on 403 or 404, and fails on other errors after trying the rest | ✅ Same                                              |
+| Posts again when the step runs again                                                         | ✅ Skips anything that already has the comment       |
+| Sends every comment at once                                                                  | ✅ One request at a time, a second between writes    |
+| `successCommentCondition` template to filter by pull request or issue fields                 | ✅ `targets`, `skip-labels`, `skip-authors`, no code |
+| Closes the "release is failing" issue, and links other release channels (`addReleases`)      | ❌ Not ported                                        |
+| `released on @channel` label for channel releases                                            | ❌ Not ported, set `labels` yourself                 |
 
 To label pre-releases differently, see [recipes](docs/recipes.md#label-pre-releases-differently).
 

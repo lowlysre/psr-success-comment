@@ -73,6 +73,8 @@ beforeEach(async () => {
   fake = await fakeGitHub()
   fake.prs.set(10, { body: 'Adds widgets.\n\nFixes #1', merge: sha.b })
   fake.issues.add(1).add(2)
+  fake.authors.set(10, 'octocat')
+  fake.labels.set(1, ['bug'])
   fake.associated.set(sha.b as string, [10])
   captureStdout()
 })
@@ -91,6 +93,7 @@ const inputs = (over: Partial<Inputs> = {}): Inputs => ({
   paths: [],
   comment: '',
   labels: ['released'],
+  filters: { targets: 'all', skipLabels: [], skipAuthors: [] },
   token: 'test-token',
   dryRun: false,
   maxTargets: 100,
@@ -117,14 +120,14 @@ describe('run', () => {
       skipped: '[]',
       failed: '[]',
       json: JSON.stringify([
-        { number: 1, url: urlOf(1, false), kind: 'issue', status: 'commented' },
-        { number: 2, url: urlOf(2, false), kind: 'issue', status: 'commented' },
-        { number: 10, url: urlOf(10, true), kind: 'pr', status: 'commented' }
+        { number: 1, kind: 'issue', url: urlOf(1, false), author: '', labels: ['bug'], status: 'commented' },
+        { number: 2, kind: 'issue', url: urlOf(2, false), author: '', labels: [], status: 'commented' },
+        { number: 10, kind: 'pr', url: urlOf(10, true), author: 'octocat', labels: [], status: 'commented' }
       ])
     })
     for (const number of [1, 2, 10]) {
       assert.ok(fake.comments.get(number)?.[0]?.endsWith(marker('v1.1.0')))
-      assert.deepEqual(fake.labels.get(number), ['released'])
+      assert.ok(fake.labels.get(number)?.includes('released'))
     }
     assert.match(stdout, /Release.*v1\.1\.0.*since v1\.0\.0, 3 commits/)
     assert.ok(stdout.includes(logStatus('commented')))
@@ -166,11 +169,28 @@ describe('run', () => {
     assert.equal(readOutputs().issues, '[2]')
   })
 
+  it('leaves out filtered targets, but still follows a filtered pull request to the issues it closes', async () => {
+    await run(inputs({ filters: { targets: 'issues', skipLabels: ['bug'], skipAuthors: [] }, summary: true }), deps())
+    assert.equal(process.exitCode, undefined)
+    assert.equal(readOutputs().commented, '[2]')
+    assert.equal(readOutputs().skipped, '[1,10]')
+    assert.equal(fake.comments.has(1), false)
+    assert.equal(fake.comments.has(10), false)
+    assert.doesNotMatch(stdout, /::warning/)
+    assert.match(stdout, /PR #10 .*\(targets is 'issues'\)/)
+    assert.match(readFileSync(summaryFile, 'utf8'), /⚪ filtered<\/td><td>label 'bug'/)
+  })
+
+  it('counts filtered targets toward max-targets', async () => {
+    await run(inputs({ maxTargets: 2, filters: { targets: 'issues', skipLabels: [], skipAuthors: [] } }), deps())
+    assert.equal(process.exitCode, 1)
+  })
+
   it('reports a dry run without writing', async () => {
     await run(inputs({ dryRun: true, summary: true }), deps())
     assert.equal(process.exitCode, undefined)
     assert.equal(fake.comments.size, 0)
-    assert.equal(fake.labels.size, 0)
+    assert.deepEqual([...fake.labels], [[1, ['bug']]])
     assert.equal(readOutputs().commented, '[]')
     assert.match(stdout, /::notice title=psr-success-comment::Dry run: no comments or labels were written\./)
     assert.match(readFileSync(summaryFile, 'utf8'), /3 commits \(dry run\)\./)
@@ -316,6 +336,7 @@ describe('readInputs', () => {
       paths: [],
       comment: '',
       labels: ['released'],
+      filters: { targets: 'all', skipLabels: [], skipAuthors: [] },
       token: 'ghs_secret',
       dryRun: false,
       maxTargets: 100,
@@ -346,6 +367,20 @@ describe('readInputs', () => {
       [read.repository, read.apiUrl, read.graphqlUrl, read.serverUrl, read.workspace],
       ['acme/widgets', 'https://ghe.test/api/v3', 'https://ghe.test/api/graphql', 'https://ghe.test', '/work']
     )
+  })
+
+  it('reads the filters', () => {
+    set({ TARGETS: ' issues ', 'SKIP-LABELS': 'wontfix\nno release note', 'SKIP-AUTHORS': 'dependabot[bot]' })
+    assert.deepEqual(readInputs({}).filters, {
+      targets: 'issues',
+      skipLabels: ['wontfix', 'no release note'],
+      skipAuthors: ['dependabot[bot]']
+    })
+  })
+
+  it('rejects an unknown targets value', () => {
+    set({ TARGETS: 'prs' })
+    assert.throws(() => readInputs({}), /Invalid 'targets' 'prs': it must be all, pull-requests, issues\./)
   })
 
   it('adds no labels when the labels input is empty', () => {

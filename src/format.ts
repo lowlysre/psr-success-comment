@@ -9,6 +9,7 @@ const TONES: Record<Status, Tone> = {
   commented: 'ok',
   'already-commented': 'idle',
   'would-comment': 'busy',
+  filtered: 'idle',
   forbidden: 'warn',
   'not-found': 'warn',
   failed: 'fail'

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { closingParser, marker } from '../src/comment.ts'
 import type { Commit } from '../src/git.ts'
-import { findClosed, findPullRequests, notify, type NotifyOptions, type Target } from '../src/release.ts'
+import { filterReason, findClosed, findPullRequests, notify, type Filters, type NotifyOptions, type Target } from '../src/release.ts'
 import { fakeGitHub, urlOf, type FakeGitHub } from './helpers.ts'
 
 const repo = { owner: 'acme', repo: 'widgets' }
@@ -19,9 +19,20 @@ afterEach(() => fake.close())
 describe('findPullRequests', () => {
   it('keeps a pull request whose merge commit is in the release, without listing its commits', async () => {
     fake.prs.set(10, { body: 'Fixes #1', merge: sha(1) })
+    fake.authors.set(10, 'octocat')
+    fake.labels.set(10, ['bug'])
     fake.associated.set(sha(1), [10])
     const prs = await findPullRequests(fake.gh, repo, [commit(1), commit(2)])
-    assert.deepEqual(prs, [{ number: 10, url: urlOf(10, true), body: 'Fixes #1', mergeCommit: { oid: sha(1) } }])
+    assert.deepEqual(prs, [
+      {
+        number: 10,
+        url: urlOf(10, true),
+        author: { login: 'octocat' },
+        labels: { nodes: [{ name: 'bug' }] },
+        body: 'Fixes #1',
+        mergeCommit: { oid: sha(1) }
+      }
+    ])
     assert.deepEqual(
       fake.calls.map(call => call.path),
       ['/graphql']
@@ -87,11 +98,13 @@ describe('findClosed', () => {
   it('resolves closing references to issues and pull requests', async () => {
     fake.issues.add(1).add(2)
     fake.prs.set(3, {})
+    fake.authors.set(2, 'octocat')
+    fake.labels.set(2, ['bug', 'wontfix'])
     const targets = await findClosed(fake.gh, repo, ['Fixes #2 and closes #3', 'fix: x\n\nResolves #1', ''], parse, new Set())
     assert.deepEqual(targets, [
-      { number: 1, url: urlOf(1, false), kind: 'issue' },
-      { number: 2, url: urlOf(2, false), kind: 'issue' },
-      { number: 3, url: urlOf(3, true), kind: 'pr' }
+      { number: 1, kind: 'issue', url: urlOf(1, false), author: '', labels: [] },
+      { number: 2, kind: 'issue', url: urlOf(2, false), author: 'octocat', labels: ['bug', 'wontfix'] },
+      { number: 3, kind: 'pr', url: urlOf(3, true), author: '', labels: [] }
     ])
   })
 
@@ -111,10 +124,42 @@ describe('findClosed', () => {
   })
 })
 
+const noFilters: Filters = { targets: 'all', skipLabels: [], skipAuthors: [] }
+
+describe('filterReason', () => {
+  const pr: Target = { number: 10, kind: 'pr', url: urlOf(10, true), author: 'dependabot', labels: ['Dependencies', 'bug'] }
+  const issue: Target = { number: 1, kind: 'issue', url: urlOf(1, false), author: '', labels: [] }
+
+  it('keeps everything by default', () => {
+    assert.equal(filterReason(pr, noFilters), undefined)
+    assert.equal(filterReason(issue, noFilters), undefined)
+  })
+
+  it('filters by kind', () => {
+    assert.equal(filterReason(pr, { ...noFilters, targets: 'issues' }), "targets is 'issues'")
+    assert.equal(filterReason(issue, { ...noFilters, targets: 'issues' }), undefined)
+    assert.equal(filterReason(issue, { ...noFilters, targets: 'pull-requests' }), "targets is 'pull-requests'")
+    assert.equal(filterReason(pr, { ...noFilters, targets: 'pull-requests' }), undefined)
+  })
+
+  it('filters by label, ignoring case', () => {
+    assert.equal(filterReason(pr, { ...noFilters, skipLabels: ['wontfix', 'dependencies'] }), "label 'Dependencies'")
+    assert.equal(filterReason(pr, { ...noFilters, skipLabels: ['wontfix'] }), undefined)
+  })
+
+  it('filters by author, matching a bot with or without its [bot] suffix', () => {
+    assert.equal(filterReason(pr, { ...noFilters, skipAuthors: ['Dependabot[bot]'] }), "author 'dependabot'")
+    assert.equal(filterReason(pr, { ...noFilters, skipAuthors: ['dependabot'] }), "author 'dependabot'")
+    assert.equal(filterReason({ ...pr, author: 'renovate[bot]' }, { ...noFilters, skipAuthors: ['renovate'] }), "author 'renovate[bot]'")
+    assert.equal(filterReason(pr, { ...noFilters, skipAuthors: ['octocat'] }), undefined)
+    assert.equal(filterReason(issue, { ...noFilters, skipAuthors: [''] }), undefined)
+  })
+})
+
 describe('notify', () => {
   const targets: Target[] = [
-    { number: 10, kind: 'pr', url: urlOf(10, true) },
-    { number: 1, kind: 'issue', url: urlOf(1, false) }
+    { number: 10, kind: 'pr', url: urlOf(10, true), author: 'octocat', labels: ['bug'] },
+    { number: 1, kind: 'issue', url: urlOf(1, false), author: 'dependabot', labels: [] }
   ]
   let pauses: number
   const options = (over: Partial<NotifyOptions> = {}): NotifyOptions => ({
@@ -124,6 +169,7 @@ describe('notify', () => {
     comment: '',
     labels: ['released'],
     dryRun: false,
+    filters: noFilters,
     pause: async () => void pauses++,
     ...over
   })
@@ -195,7 +241,12 @@ describe('notify', () => {
     fake.canned.set('POST /repos/acme/widgets/issues/10/comments', [
       { status: 403, body: { message: 'Resource not accessible by integration' } }
     ])
-    const results = await notify(fake.gh, repo, [...targets, { number: 404, kind: 'issue', url: urlOf(404, false) }], options())
+    const results = await notify(
+      fake.gh,
+      repo,
+      [...targets, { number: 404, kind: 'issue', url: urlOf(404, false), author: '', labels: [] }],
+      options()
+    )
     assert.deepEqual(
       results.map(result => result.status),
       ['forbidden', 'commented', 'not-found']
@@ -214,6 +265,24 @@ describe('notify', () => {
     )
     assert.match(results[0]?.detail as string, /422: Validation Failed/)
     assert.equal(fake.comments.get(1)?.length, 1)
+  })
+
+  it('reports filtered targets without making a request for them', async () => {
+    const results = await notify(
+      fake.gh,
+      repo,
+      targets,
+      options({ filters: { ...noFilters, skipLabels: ['bug'], skipAuthors: ['dependabot[bot]'] } })
+    )
+    assert.deepEqual(
+      results.map(result => [result.status, result.detail]),
+      [
+        ['filtered', "label 'bug'"],
+        ['filtered', "author 'dependabot'"]
+      ]
+    )
+    assert.equal(fake.calls.length, 0)
+    assert.equal(pauses, 0)
   })
 
   it('uses a custom comment template', async () => {

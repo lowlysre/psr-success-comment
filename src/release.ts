@@ -7,9 +7,15 @@ export interface Repo {
   repo: string
 }
 
-export interface PullRequest {
+/** The fields read for every pull request and issue. */
+interface Node {
   number: number
   url: string
+  author: { login: string } | null
+  labels: { nodes: { name: string }[] } | null
+}
+
+export interface PullRequest extends Node {
   body: string | null
   mergeCommit: { oid: string } | null
 }
@@ -18,9 +24,20 @@ export interface Target {
   number: number
   kind: Kind
   url: string
+  /** Login of the author, empty when the account was deleted. */
+  author: string
+  labels: string[]
 }
 
-export type Status = 'commented' | 'already-commented' | 'would-comment' | 'forbidden' | 'not-found' | 'failed'
+export type Status = 'commented' | 'already-commented' | 'would-comment' | 'filtered' | 'forbidden' | 'not-found' | 'failed'
+
+export type TargetKinds = 'all' | 'pull-requests' | 'issues'
+
+export interface Filters {
+  targets: TargetKinds
+  skipLabels: string[]
+  skipAuthors: string[]
+}
 
 export interface Result extends Target {
   status: Status
@@ -34,6 +51,7 @@ export interface NotifyOptions {
   comment: string
   labels: string[]
   dryRun: boolean
+  filters: Filters
   /** Waits between write requests. */
   pause: () => Promise<void>
 }
@@ -45,11 +63,31 @@ interface PullRequestPage {
 type CommitNode = { associatedPullRequests?: PullRequestPage } | null
 
 const CHUNK = 100
-const PAGE =
-  'associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { number url body mergeCommit { oid } } }'
+const NODE = 'number url author { login } labels(first: 100) { nodes { name } }'
+const PAGE = `associatedPullRequests(first: 100, after: $cursor) { pageInfo { hasNextPage endCursor } nodes { ${NODE} body mergeCommit { oid } } }`
 const NEXT_PAGE = `query($owner: String!, $repo: String!, $sha: GitObjectID!, $cursor: String) {
   repository(owner: $owner, name: $repo) { commit: object(oid: $sha) { ... on Commit { ${PAGE} } } }
 }`
+
+export const toTarget = (node: Node, kind: Kind): Target => ({
+  number: node.number,
+  kind,
+  url: node.url,
+  author: node.author?.login ?? '',
+  labels: node.labels?.nodes.map(label => label.name) ?? []
+})
+
+// GraphQL reports a bot as "dependabot" and REST as "dependabot[bot]"; both spellings match.
+const normalize = (name: string): string => name.toLowerCase().replace(/\[bot\]$/, '')
+
+/** Why the filters leave a target out, or undefined when it should be commented on. */
+export function filterReason(target: Target, { targets, skipLabels, skipAuthors }: Filters): string | undefined {
+  if (targets !== 'all' && (targets === 'pull-requests') !== (target.kind === 'pr')) return `targets is '${targets}'`
+  const label = target.labels.find(name => skipLabels.some(skip => normalize(skip) === normalize(name)))
+  if (label) return `label '${label}'`
+  if (target.author && skipAuthors.some(skip => normalize(skip) === normalize(target.author))) return `author '${target.author}'`
+  return undefined
+}
 
 function* chunks<T>(items: T[], size: number): Generator<T[]> {
   for (let i = 0; i < items.length; i += size) yield items.slice(i, i + size)
@@ -110,17 +148,17 @@ export async function findClosed(
 
   for (const chunk of chunks(numbers, CHUNK)) {
     const fields = chunk
-      .map(n => `i${n}: issueOrPullRequest(number: ${n}) { __typename ... on Issue { number url } ... on PullRequest { number url } }`)
+      .map(n => `i${n}: issueOrPullRequest(number: ${n}) { __typename ... on Issue { ${NODE} } ... on PullRequest { ${NODE} } }`)
       .join('\n')
     const query = `query($owner: String!, $repo: String!) { repository(owner: $owner, name: $repo) {\n${fields}\n} }`
-    const { repository } = await gh.graphql<{ repository: Record<string, (Omit<Target, 'kind'> & { __typename: string }) | null> }>(query, {
+    const { repository } = await gh.graphql<{ repository: Record<string, (Node & { __typename: string }) | null> }>(query, {
       owner,
       repo
     })
     for (const number of chunk) {
       // A number that is not an issue or pull request in this repository comes back as null.
       const node = repository[`i${number}`]
-      if (node) targets.push({ number: node.number, url: node.url, kind: node.__typename === 'PullRequest' ? 'pr' : 'issue' })
+      if (node) targets.push(toTarget(node, node.__typename === 'PullRequest' ? 'pr' : 'issue'))
     }
   }
   return targets
@@ -129,6 +167,7 @@ export async function findClosed(
 /**
  * Comments on and labels each target, one request at a time. A target that already carries this
  * release's marker is not commented on again. 403 and 404 skip the target; other errors mark it failed.
+ * A target the filters leave out is reported without any request.
  */
 export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[], options: NotifyOptions): Promise<Result[]> {
   const results: Result[] = []
@@ -136,6 +175,11 @@ export async function notify(gh: GitHub, { owner, repo }: Repo, targets: Target[
 
   for (const target of targets) {
     const issue = `/repos/${owner}/${repo}/issues/${target.number}`
+    const filtered = filterReason(target, options.filters)
+    if (filtered) {
+      results.push({ ...target, status: 'filtered', detail: filtered })
+      continue
+    }
     try {
       const comments = await gh.paginate<{ body?: string | null }>(`${issue}/comments`)
       const exists = comments.some(comment => comment.body?.includes(needle))

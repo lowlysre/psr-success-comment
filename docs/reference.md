@@ -2,6 +2,7 @@
 
 - [Inputs](#inputs)
 - [Outputs](#outputs)
+- [Filters](#filters)
 - [Results](#results)
 - [The comment](#the-comment)
 - [Logs, annotations, and failures](#logs-annotations-and-failures)
@@ -17,6 +18,9 @@
 | `paths`        | no       |                       | Paths, one per line. Only commits that touch them count as part of the release.                           |
 | `comment`      | no       | built in              | Comment template. See [the comment](#the-comment).                                                        |
 | `labels`       | no       | `released`            | Labels to add, one per line. An empty string adds none.                                                   |
+| `targets`      | no       | `all`                 | Which kinds to comment on and label: `all`, `pull-requests`, or `issues`. See [filters](#filters).        |
+| `skip-labels`  | no       |                       | Labels, one per line. Anything that has one of them is left alone.                                        |
+| `skip-authors` | no       |                       | Author logins, one per line. Anything they opened is left alone.                                          |
 | `max-targets`  | no       | `100`                 | Fail, without writing, when more pull requests and issues than this are found. `0` means no limit.        |
 | `dry-run`      | no       | `false`               | Find and report the pull requests and issues without commenting or labeling.                              |
 | `summary`      | no       | `true`                | Write the results to the job summary page.                                                                |
@@ -30,20 +34,30 @@ The action reads the repository from `GITHUB_REPOSITORY` and the API addresses f
 
 ## Outputs
 
-| Output          | Description                                                                 |
-|-----------------|-----------------------------------------------------------------------------|
-| `previous-tag`  | Tag the release was compared with. Empty on a first release.                |
-| `commits`       | Number of commits in the release.                                           |
-| `pull-requests` | JSON array of the pull request numbers found.                               |
-| `issues`        | JSON array of the issue numbers found.                                      |
-| `commented`     | JSON array of the numbers that received a comment in this run.              |
-| `skipped`       | JSON array of the numbers skipped: already commented, forbidden, not found. |
-| `failed`        | JSON array of the numbers that could not be updated.                        |
-| `json`          | JSON array with one object per pull request and issue.                      |
+| Output          | Description                                                                           |
+|-----------------|---------------------------------------------------------------------------------------|
+| `previous-tag`  | Tag the release was compared with. Empty on a first release.                          |
+| `commits`       | Number of commits in the release.                                                     |
+| `pull-requests` | JSON array of the pull request numbers found.                                         |
+| `issues`        | JSON array of the issue numbers found.                                                |
+| `commented`     | JSON array of the numbers that received a comment in this run.                        |
+| `skipped`       | JSON array of the numbers skipped: already commented, filtered, forbidden, not found. |
+| `failed`        | JSON array of the numbers that could not be updated.                                  |
+| `json`          | JSON array with one object per pull request and issue.                                |
 
-Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `status`, and, when something went wrong, `detail` with the error message. Read it with `fromJSON`.
+Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels`, and `status`. `author` and `labels` are as they were before this run. A filtered or unsuccessful entry also has `detail`, with the filter that matched or the error message. Read it with `fromJSON`.
 
 No outputs are set when the step fails before it has results, for example when `max-targets` is exceeded or the tag is missing.
+
+## Filters
+
+Three inputs leave pull requests and issues out. A filtered one gets no comment and no label, and no request is made for it.
+
+- `targets` keeps one kind. With `issues`, pull requests are not commented on, but their descriptions are still read to find the issues they close.
+- `skip-labels` matches label names without regard to case. Up to 100 labels are read per pull request or issue.
+- `skip-authors` matches logins without regard to case. A bot matches with or without its `[bot]` suffix, so `dependabot` and `dependabot[bot]` are the same.
+
+Filters apply after `max-targets` is checked, so filtered pull requests and issues count toward the limit.
 
 ## Results
 
@@ -54,6 +68,7 @@ Every pull request and issue ends with one `status`.
 | `commented`         | The comment was posted, and labels were added.                                          | no         |
 | `already-commented` | This release's comment was already there. Labels were still added.                      | no         |
 | `would-comment`     | Dry run: a real run would comment.                                                      | no         |
+| `filtered`          | Left out by `targets`, `skip-labels`, or `skip-authors`. Nothing was requested.         | no         |
 | `forbidden`         | GitHub answered 403 for this pull request or issue. Logged as a warning.                | no         |
 | `not-found`         | GitHub answered 404. Logged as a warning.                                               | no         |
 | `failed`            | Any other error, including a rate limit that outlasted the retries. Logged as an error. | yes        |
@@ -89,13 +104,13 @@ Every comment ends with a hidden HTML comment, `<!-- psr-success-comment tag=v1.
 
 The log lists each pull request and issue with a colored dot for its status. The job summary shows the same list as a table with colored circles, because it doesn't render ANSI colors.
 
-| Color  | Statuses                 |
-|--------|--------------------------|
-| Green  | `commented`              |
-| Gray   | `already-commented`      |
-| Blue   | `would-comment`          |
-| Yellow | `forbidden`, `not-found` |
-| Red    | `failed`                 |
+| Color  | Statuses                        |
+|--------|---------------------------------|
+| Green  | `commented`                     |
+| Gray   | `already-commented`, `filtered` |
+| Blue   | `would-comment`                 |
+| Yellow | `forbidden`, `not-found`        |
+| Red    | `failed`                        |
 
 The step fails with an error annotation when:
 
