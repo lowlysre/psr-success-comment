@@ -1,0 +1,7 @@
+# Read by MegaLinter's actionlint (.github/linters/actionlint.yml).
+paths:
+  .github/workflows/release.yml:
+    ignore:
+      # `uses: $/` is the repository's own action, as the dogfooding step in release.yml intends.
+      # actionlint only knows `./` and `owner/repo@ref`.
+      - 'specifying action "\$/" in invalid format'
