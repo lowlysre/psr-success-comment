@@ -1,0 +1,6 @@
+name: CodeQL config
+
+# dist/ is the bundled build of src/ plus third-party dependencies. src/ is analyzed directly,
+# and bundled dependency code produces findings this action can't act on.
+paths-ignore:
+  - dist

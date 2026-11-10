@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release and announce
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # python-semantic-release pushes the tags and creates the GitHub release
+      issues: write # psr-success-comment comments on and labels the released issues
+      pull-requests: write # psr-success-comment comments on and labels the released pull requests
+    steps:
+      # Audit, not block: python-semantic-release builds a Docker image at run time, and the
+      # endpoints that build needs have not been observed yet. Switch to block, with the endpoints
+      # from the first run's report, once they are known.
+      - name: Harden runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Release
+        id: release
+        uses: python-semantic-release/python-semantic-release@b700dbeb1f431a0fcc30a79f3f0869407fe07278 # v10.7.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          config_file: .github/releaserc.toml
+          commit: false
+          changelog: false
+
+      - name: Comment on released pull requests and issues
+        if: ${{ steps.release.outputs.released == 'true' }}
+        uses: $/
+        with:
+          tag: ${{ steps.release.outputs.tag }}
+          version: ${{ steps.release.outputs.version }}
+          release-url: ${{ steps.release.outputs.link }}
+          skip-authors: |
+            dependabot[bot]

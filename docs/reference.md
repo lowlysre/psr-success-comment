@@ -1,0 +1,127 @@
+# Reference
+
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+- [Filters](#filters)
+- [Results](#results)
+- [The comment](#the-comment)
+- [Logs, annotations, and failures](#logs-annotations-and-failures)
+
+## Inputs
+
+| Input          | Required | Default               | Description                                                                                               |
+|----------------|----------|-----------------------|-----------------------------------------------------------------------------------------------------------|
+| `tag`          | yes      |                       | Git tag of the release. Pass PSR's `tag` output. The tag must exist in the checkout.                      |
+| `version`      | yes      |                       | Version of the release. Pass PSR's `version` output.                                                      |
+| `release-url`  | no       |                       | URL of the release, linked from the comment and the job summary. Pass PSR's `link` output.                |
+| `previous-tag` | no       | derived               | Tag of the previous release. See [how the previous release is found](how-it-works.md#1-find-the-commits). |
+| `paths`        | no       |                       | Paths, one per line. Only commits that touch them count as part of the release.                           |
+| `comment`      | no       | built in              | Comment template. See [the comment](#the-comment).                                                        |
+| `labels`       | no       | `released`            | Labels to add, one per line. An empty string adds none.                                                   |
+| `targets`      | no       | `all`                 | Which kinds to comment on and label: `all`, `pull-requests`, or `issues`. See [filters](#filters).        |
+| `skip-labels`  | no       |                       | Labels, one per line. Anything that has one of them is left alone.                                        |
+| `skip-authors` | no       |                       | Author logins, one per line. Anything they opened is left alone.                                          |
+| `max-targets`  | no       | `100`                 | Fail, without writing, when more pull requests and issues than this are found. `0` means no limit.        |
+| `dry-run`      | no       | `false`               | Find and report the pull requests and issues without commenting or labeling.                              |
+| `summary`      | no       | `true`                | Write the results to the job summary page.                                                                |
+| `token`        | no       | `${{ github.token }}` | Token used to read pull requests and to comment and label. See [permissions](permissions.md).             |
+
+`tag`, `version`, and `link` are outputs of the PSR action, declared in its [`action.yml`](https://github.com/python-semantic-release/python-semantic-release/blob/60de8fcacea7fd5177f34368490677be5f098995/action.yml#L124-L158).
+
+`paths` entries are `git log` pathspecs ("pathspec" in the [git glossary](https://git-scm.com/docs/gitglossary)), relative to `GITHUB_WORKSPACE`.
+
+The action reads `GITHUB_REPOSITORY`, `GITHUB_API_URL`, and `GITHUB_GRAPHQL_URL`, which the runner sets, and runs git in `GITHUB_WORKSPACE`, where the repository must be checked out.
+
+## Outputs
+
+| Output          | Description                                                                           |
+|-----------------|---------------------------------------------------------------------------------------|
+| `previous-tag`  | Tag the release was compared with. Empty on a first release.                          |
+| `commits`       | Number of commits in the release.                                                     |
+| `pull-requests` | JSON array of the pull request numbers found.                                         |
+| `issues`        | JSON array of the issue numbers found.                                                |
+| `commented`     | JSON array of the numbers that received a comment in this run, including any whose labels then failed.                |
+| `skipped`       | JSON array of the numbers skipped: already commented, filtered, forbidden, not found. |
+| `failed`        | JSON array of the numbers that could not be updated.                                  |
+| `json`          | JSON array with one object per pull request and issue.                                |
+
+Each object in `json` has `number`, `kind` (`pr` or `issue`), `url`, `author`, `labels` (as before this run), `status`, and `commented` (whether this run posted the comment). A filtered or unsuccessful entry also has `detail`: the filter that matched, or the error. Read it with `fromJSON`.
+
+A step that fails before it has results, such as on `max-targets` or a missing tag, sets no outputs.
+
+## Filters
+
+A filtered pull request or issue gets no comment, no label, and no request.
+
+- `targets` keeps one kind. With `issues`, pull requests are not commented on, but their descriptions are still read to find the issues they close.
+- `skip-labels` matches label names case-insensitively, among the first 100 labels of each target.
+- `skip-authors` matches logins case-insensitively. A bot matches with or without `[bot]`: `dependabot` and `dependabot[bot]` are the same.
+
+Filters apply after the `max-targets` check, so filtered targets count toward the limit.
+
+## Results
+
+Every pull request and issue ends with one `status`.
+
+| Status              | Meaning                                                                                 | Step fails |
+|---------------------|-----------------------------------------------------------------------------------------|------------|
+| `commented`         | The comment was posted, and labels were added.                                          | no         |
+| `already-commented` | This release's comment was already there. Labels were still added.                      | no         |
+| `would-comment`     | Dry run: a real run would comment.                                                      | no         |
+| `filtered`          | Left out by `targets`, `skip-labels`, or `skip-authors`. Nothing was requested.         | no         |
+| `forbidden`         | GitHub answered 403 for this pull request or issue. Logged as a warning.                | no         |
+| `not-found`         | GitHub answered 404. Logged as a warning.                                               | no         |
+| `failed`            | Any other error, including a rate limit that outlasted the retries. Logged as an error. | yes        |
+
+A failure on one target doesn't stop the others. The step fails at the end, after the outputs and summary are written. Re-running is safe: a target that has the comment is `already-commented`.
+
+If the comment posts and adding labels fails, the status is `failed` with the label error in `detail`, and the number is in both `commented` and `failed`. The next run finds the comment and adds the labels.
+
+## The comment
+
+The built-in comment follows the wording of [`@semantic-release/github`](https://github.com/semantic-release/github/blob/30e351e9378ca93c88d064ad047bb102019f8993/lib/get-success-comment.js#L9-L25):
+
+```markdown
+:tada: This PR is included in version 1.4.0 :tada:
+
+The release is available on [v1.4.0](https://github.com/acme/widgets/releases/tag/v1.4.0)
+```
+
+An issue gets "This issue has been resolved in version 1.4.0". The second paragraph is omitted when `release-url` is empty.
+
+`comment` replaces the text. These placeholders are filled in, and anything else is posted as written:
+
+| Placeholder | Value                                    |
+|-------------|------------------------------------------|
+| `{version}` | The `version` input.                     |
+| `{tag}`     | The `tag` input.                         |
+| `{url}`     | The `release-url` input, possibly empty. |
+| `{type}`    | `pull request` or `issue`.               |
+
+Every comment ends with a hidden marker, `<!-- psr-success-comment tag=v1.4.0 -->`. A later run uses it to see that the release was announced. A comment without it, or with another tag, doesn't count.
+
+## Logs, annotations, and failures
+
+The log lists each target with a colored dot. The job summary shows a table with colored circles, since it doesn't render ANSI colors.
+
+| Color  | Statuses                        |
+|--------|---------------------------------|
+| Green  | `commented`                     |
+| Gray   | `already-commented`, `filtered` |
+| Blue   | `would-comment`                 |
+| Yellow | `forbidden`, `not-found`        |
+| Red    | `failed`                        |
+
+The step fails with an error annotation when:
+
+| Cause                                         | Message                                                                                         |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------|
+| A required input is missing                   | `Input required and not supplied: <name>`                                                       |
+| `max-targets` isn't a whole number            | `Invalid 'max-targets' '<value>': ...`                                                          |
+| The checkout is shallow                       | `The checkout is a shallow clone, so the release's commits can't be listed. ...`                |
+| `tag` or `previous-tag` isn't in the checkout | `Tag '<tag>' was not found in the checkout. ...`                                                |
+| `tag` doesn't contain `version`               | `Tag '<tag>' does not contain version '<version>', so the previous tag can't be derived. ...`   |
+| Too many pull requests and issues             | `Found <n> pull requests and issues, more than 'max-targets' (<max>). Nothing was changed. ...` |
+| A pull request or issue couldn't be updated   | `Failed to update #<n>, #<m>. Re-running is safe: existing comments are not repeated.`          |
+| The GitHub API rejected a lookup              | `<METHOD> <path> returned <status>: <message>` or `GraphQL query failed: <message>`             |
+| git failed                                    | `git <command> failed: <stderr>`                                                                |

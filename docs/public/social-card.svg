@@ -1,0 +1,121 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">PSR Success Comment</title>
+  <desc id="desc">Social card: the lowlysre inchworm inches along a release's pull requests and issues toward the v1.4.0 tag. The two behind it already have a comment. It is telling the next one that it is included in version 1.4.0 and adding a released label.</desc>
+  <!-- Palette: the lowlysre brand kit's dark theme (worm #3fb950, background #0d1117, text #8b949e),
+       GitHub's dark-theme blue and purple, and Python's yellow as the accent. -->
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#58a6ff" stroke-opacity="0.05" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="glow" cx="1080" cy="20" r="700" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f6feb" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#1f6feb" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="820" cy="560" r="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#238636" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#238636" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="heading" x1="80" y1="0" x2="500" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3fb950"/>
+      <stop offset="0.55" stop-color="#58a6ff"/>
+      <stop offset="1" stop-color="#a371f7"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="#0d1117"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+  <rect width="1280" height="640" fill="url(#glow2)"/>
+
+  <!-- Mark: docs/public/logo.svg on its 200-unit grid, drawn 56px wide. -->
+  <g transform="translate(78 78) scale(0.28)">
+    <rect x="6" y="6" width="188" height="188" rx="40" fill="#161b22" stroke="#30363d" stroke-width="5"/>
+    <g transform="translate(4 44) scale(0.9)">
+      <path d="M38,136 Q68,60 100,60 Q132,60 158,130" stroke="#3fb950" stroke-width="24" stroke-linecap="round" fill="none"/>
+      <circle cx="34" cy="138" r="13" fill="#3fb950"/>
+      <circle cx="162" cy="136" r="18" fill="#3fb950"/>
+      <circle cx="167.5" cy="130.5" r="4.2" fill="#161b22"/>
+      <path d="M171,121 q4,-11 13,-14 M162,119 q0,-12 6,-18" stroke="#3fb950" stroke-width="4" stroke-linecap="round" fill="none"/>
+      <path d="M172,141 q4.5,3.5 9,1" stroke="#161b22" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+    </g>
+    <path d="M106 18h60a14 14 0 0 1 14 14v18a14 14 0 0 1-14 14h-2l4 18-20-18H106a14 14 0 0 1-14-14V32a14 14 0 0 1 14-14z" fill="#161b22" stroke="#58a6ff" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M118 41l11 11 21-22" fill="none" stroke="#e6edf3" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g font-family="Segoe UI" font-weight="700" font-size="72" fill="url(#heading)">
+    <text x="78" y="226">PSR Success</text>
+    <text x="78" y="306">Comment</text>
+  </g>
+  <g font-family="Segoe UI" font-size="25" fill="#c9d1d9">
+    <text x="80" y="374">Tell pull requests and issues</text>
+    <text x="80" y="408">which release shipped them.</text>
+  </g>
+  <g transform="translate(80 446)">
+    <rect width="44" height="4" rx="2" fill="#3fb950"/>
+    <rect x="48" width="44" height="4" rx="2" fill="#58a6ff"/>
+    <rect x="96" width="44" height="4" rx="2" fill="#a371f7"/>
+    <rect x="144" width="44" height="4" rx="2" fill="#ffd43b"/>
+  </g>
+  <text x="80" y="548" font-family="Cascadia Mono" font-size="19" fill="#8b949e">lowlysre/psr-success-comment</text>
+  <text x="80" y="580" font-family="Segoe UI" font-size="16" fill="#6e7681">Not affiliated with python-semantic-release or GitHub.</text>
+
+  <!-- Scene: the release as a rail at y=462, from the first pull request (x=560) to the tag (x=1204).
+       Done stops are filled and carry a small comment bubble; stops ahead are hollow on a dashed rail.
+       The inchworm is the brand icon at 1.7x, standing on the rail between the two groups. -->
+  <path d="M532 462H904" stroke="#238636" stroke-width="4" stroke-linecap="round"/>
+  <path d="M904 462H1204" stroke="#484f58" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 12"/>
+  <g font-family="Cascadia Mono" font-size="15">
+    <circle cx="560" cy="462" r="9" fill="#a371f7" stroke="#a371f7" stroke-width="3"/>
+    <text x="560" y="496" text-anchor="middle" fill="#8b949e">#128</text>
+    <circle cx="626" cy="462" r="9" fill="#3fb950" stroke="#3fb950" stroke-width="3"/>
+    <text x="626" y="496" text-anchor="middle" fill="#8b949e">#131</text>
+    <circle cx="1004" cy="462" r="9" fill="#0d1117" stroke="#484f58" stroke-width="3"/>
+    <text x="1004" y="496" text-anchor="middle" fill="#6e7681">#135</text>
+    <circle cx="1070" cy="462" r="9" fill="#0d1117" stroke="#484f58" stroke-width="3"/>
+    <text x="1070" y="496" text-anchor="middle" fill="#6e7681">#140</text>
+    <circle cx="1136" cy="462" r="9" fill="#0d1117" stroke="#484f58" stroke-width="3"/>
+    <text x="1136" y="496" text-anchor="middle" fill="#6e7681">#142</text>
+  </g>
+    <g transform="translate(541 404)">
+      <path d="M7 0h24a7 7 0 0 1 7 7v14a7 7 0 0 1-7 7H25l-6 8-6-8H7a7 7 0 0 1-7-7V7a7 7 0 0 1 7-7z" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+      <path d="M11 14l5.5 5.5L27 8.5" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(607 404)">
+      <path d="M7 0h24a7 7 0 0 1 7 7v14a7 7 0 0 1-7 7H25l-6 8-6-8H7a7 7 0 0 1-7-7V7a7 7 0 0 1 7-7z" fill="#161b22" stroke="#58a6ff" stroke-width="2"/>
+      <path d="M11 14l5.5 5.5L27 8.5" fill="none" stroke="#3fb950" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+  <!-- Release tag at the end of the rail -->
+  <path d="M1204 462V424" stroke="#ffd43b" stroke-width="3" stroke-linecap="round"/>
+  <rect x="1166" y="396" width="76" height="28" rx="14" fill="#161b22" stroke="#ffd43b" stroke-width="2"/>
+  <text x="1204" y="415" font-family="Cascadia Mono" font-size="15" fill="#ffd43b" text-anchor="middle">v1.4.0</text>
+
+  <!-- Inchworm -->
+  <g transform="translate(628 204) scale(1.7)">
+    <path d="M38,136 Q68,60 100,60 Q132,60 158,130" stroke="#3fb950" stroke-width="24" stroke-linecap="round" fill="none"/>
+    <circle cx="34" cy="138" r="13" fill="#3fb950"/>
+    <circle cx="162" cy="136" r="18" fill="#3fb950"/>
+    <circle cx="167.5" cy="130.5" r="4.2" fill="#0d1117"/>
+    <path d="M171,121 q4,-11 13,-14 M162,119 q0,-12 6,-18" stroke="#3fb950" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M172,141 q4.5,3.5 9,1" stroke="#0d1117" stroke-width="2.8" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- What it is saying -->
+  <g transform="translate(22 -40)">
+    <rect x="946" y="172" width="12" height="5" rx="2.5" fill="#3fb950" transform="rotate(20 952 174.5)"/>
+    <rect x="1010" y="158" width="12" height="5" rx="2.5" fill="#ffd43b" transform="rotate(-30 1016 160.5)"/>
+    <rect x="1078" y="174" width="12" height="5" rx="2.5" fill="#a371f7" transform="rotate(45 1084 176.5)"/>
+    <rect x="1150" y="160" width="12" height="5" rx="2.5" fill="#58a6ff" transform="rotate(10 1156 162.5)"/>
+    <rect x="1212" y="176" width="12" height="5" rx="2.5" fill="#3fb950" transform="rotate(-50 1218 178.5)"/>
+    <rect x="1246" y="222" width="12" height="5" rx="2.5" fill="#ffd43b" transform="rotate(25 1252 224.5)"/>
+    <rect x="914" y="214" width="12" height="5" rx="2.5" fill="#a371f7" transform="rotate(-15 920 216.5)"/>
+    <rect x="1244" y="300" width="12" height="5" rx="2.5" fill="#58a6ff" transform="rotate(60 1250 302.5)"/>
+    <path d="M946 196h268a16 16 0 0 1 16 16v118a16 16 0 0 1-16 16H1004l-66 58 24-58h-16a16 16 0 0 1-16-16V212a16 16 0 0 1 16-16z" fill="#161b22" stroke="#58a6ff" stroke-width="2.5" stroke-linejoin="round"/>
+    <g font-family="Segoe UI" font-size="21" font-weight="600" fill="#e6edf3">
+      <text x="956" y="240"><tspan fill="#ffd43b">&#9733;</tspan> This PR is included</text>
+      <text x="956" y="270">in version 1.4.0 <tspan fill="#ffd43b">&#9733;</tspan></text>
+    </g>
+    <rect x="956" y="292" width="88" height="28" rx="14" fill="#238636" fill-opacity="0.25" stroke="#3fb950" stroke-width="1.5"/>
+    <text x="1000" y="311" font-family="Segoe UI" font-weight="600" font-size="14" fill="#3fb950" text-anchor="middle">released</text>
+    <text x="1054" y="311" font-family="Segoe UI" font-size="14" fill="#8b949e">label added</text>
+  </g>
+</svg>

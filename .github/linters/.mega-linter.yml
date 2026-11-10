@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/oxsecurity/megalinter/main/megalinter/descriptors/schemas/megalinter-configuration.jsonschema.json
+APPLY_FIXES: none
+SHOW_ELAPSED_TIME: true
+FLAVOR_SUGGESTIONS: false
+PRINT_ALPACA: false
+GITHUB_COMMENT_REPORTER: false
+GITHUB_STATUS_REPORTER: false
+UPDATED_SOURCES_REPORTER: false
+SARIF_REPORTER: false
+
+TYPESCRIPT_DEFAULT_STYLE: prettier
+JAVASCRIPT_DEFAULT_STYLE: prettier
+
+# Generated files.
+FILTER_REGEX_EXCLUDE: (dist/|node_modules/|package-lock\.json)
+
+# Checks relative links and #anchors across the docs without network access. Remote URLs are
+# skipped because the egress policy blocks them.
+SPELL_LYCHEE_ARGUMENTS: --offline --include-fragments
+
+# The egress policy blocks everything except the endpoints listed in the workflow, so linters
+# that download data at run time (vulnerability databases) stay off. zizmor runs as its own CI job.
+DISABLE_LINTERS:
+  - ACTION_ZIZMOR
+  - TYPESCRIPT_STANDARD
+  - JAVASCRIPT_STANDARD
+  - REPOSITORY_TRIVY
+  - REPOSITORY_TRIVY_SBOM
+  - REPOSITORY_GRYPE
+  - REPOSITORY_OSV_SCANNER
+  - REPOSITORY_CHECKOV
+  - COPYPASTE_JSCPD
+  - SPELL_CSPELL
