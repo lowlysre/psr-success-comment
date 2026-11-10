@@ -96,7 +96,7 @@ Not ported: closing "release is failing" issues (L266-L303), and `addReleases` (
 ## What is not tested
 
 - Posting comments and adding labels against the live GitHub API. Only the test server has received writes.
-- A run inside GitHub Actions with `GITHUB_TOKEN`, including which permissions the GraphQL lookups need.
+- A run inside GitHub Actions with `GITHUB_TOKEN`, including which permissions the GraphQL lookups need. This repository's own [release workflow](contributing.md#releases) runs the action on each release and will cover this and the previous point once it has run.
 - A real PSR monorepo. Tag matching and `paths` are tested on synthetic repositories only.
 - GitHub Enterprise Server.
 - Whether PSR's own conversion of a shallow clone (its [docs](https://github.com/python-semantic-release/python-semantic-release/blob/60de8fcacea7fd5177f34368490677be5f098995/docs/configuration/automatic-releases/github-actions.rst?plain=1#L971-L977) describe it from v10.5.0) leaves the history this action needs. `fetch-depth: 0` avoids the question.

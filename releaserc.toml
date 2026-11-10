@@ -1,0 +1,10 @@
+# Configuration for python-semantic-release, which cuts this action's releases in
+# .github/workflows/release.yml. The workflow runs it with `commit: false` and `changelog: false`,
+# so a release is a tag on the pushed commit plus a GitHub release, with no version-bump commit.
+
+[semantic_release]
+tag_format = "v{version}"
+# Keeps the moving v1 and v1.2 tags that workflows reference as `@v1`.
+add_partial_tags = true
+# The first release is 1.0.0, not 0.1.0.
+allow_zero_version = false
