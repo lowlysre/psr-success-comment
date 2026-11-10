@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/public/social-card.png" alt="PSR Success Comment: a pull request that receives a comment saying it is included in version 1.4.0, and a released label" width="720">
+  <img src="docs/public/social-card.png" alt="PSR Success Comment: the lowlysre inchworm inches along a release's pull requests and issues, telling each one it is included in version 1.4.0 and adding a released label" width="720">
 </p>
 
 <p align="center">
